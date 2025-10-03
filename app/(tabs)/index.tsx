@@ -1,14 +1,228 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import { DrawerNavigationProp } from "@react-navigation/drawer";
+import { useNavigation } from "@react-navigation/native";
+import { useState } from "react";
+import {
+  FlatList,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { Menu, MenuOption, MenuOptions, MenuTrigger } from "react-native-popup-menu";
+
+// Drawer tipleri
+type RootDrawerParamList = {
+  index: undefined;
+  "create-deck": undefined;
+  stats: undefined;
+};
+
+// örnek veriler
+const initialDecks = [
+  { id: "1", name: "Deste 1", description: "İlk deste" },
+  { id: "2", name: "Deste 2", description: "İkinci deste" },
+];
 
 export default function IndexScreen() {
+  const navigation = useNavigation<DrawerNavigationProp<RootDrawerParamList>>();
+  const [decks, setDecks] = useState(initialDecks);
+  const [search, setSearch] = useState("");
+  const [showSheet, setShowSheet] = useState(false);
+
+  // Bottom sheet form state
+  const [newDeck, setNewDeck] = useState({
+    name: "",
+    description: "",
+    termLang: "",
+    defLang: "",
+  });
+
+  const filteredDecks = decks.filter((d) =>
+    d.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const addDeck = () => {
+    if (newDeck.name.trim() === "") return;
+    setDecks([
+      ...decks,
+      { id: Date.now().toString(), name: newDeck.name, description: newDeck.description },
+    ]);
+    setNewDeck({ name: "", description: "", termLang: "", defLang: "" });
+    setShowSheet(false);
+  };
+
+  const renderDeck = ({ item }: any) => (
+    <View style={styles.deckCard}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Text style={styles.deckTitle}>{item.name}</Text>
+
+        {/* Overflow Menu */}
+        <Menu>
+          <MenuTrigger>
+            <Ionicons name="ellipsis-vertical" size={20} color="#333" />
+          </MenuTrigger>
+          <MenuOptions>
+            <MenuOption onSelect={() => alert("Edit " + item.name)} text="Edit" />
+            <MenuOption onSelect={() => alert("Remove " + item.name)} text="Remove" />
+            <MenuOption onSelect={() => alert(item.name + " Count: 20")} text="Count" />
+          </MenuOptions>
+        </Menu>
+      </View>
+
+      <Text style={styles.deckDesc}>{item.description}</Text>
+
+      <View style={styles.deckButtons}>
+        <TouchableOpacity style={styles.practiceBtn}>
+          <Text style={styles.btnText}>Practice</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.addCardBtn}>
+          <Text style={styles.btnText}>+ Add Card</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
-      <Text style={styles.title}>Merhaba! Burası ana sayfa</Text>
+    <View style={styles.container}>
+      {/* Search bar + Hamburger */}
+      <View style={styles.searchRow}>
+        <TouchableOpacity onPress={() => navigation.openDrawer()}>
+          <Ionicons name="menu" size={28} color="#333" />
+        </TouchableOpacity>
+        <TextInput
+          placeholder="Search..."
+          value={search}
+          onChangeText={setSearch}
+          style={styles.search}
+        />
+      </View>
+
+      {/* Deck List */}
+      <FlatList
+        data={filteredDecks}
+        keyExtractor={(item) => item.id}
+        renderItem={renderDeck}
+        contentContainerStyle={{ paddingBottom: 80 }}
+      />
+
+      {/* Create Deck Button */}
+      <TouchableOpacity style={styles.createBtn} onPress={() => setShowSheet(true)}>
+        <Text style={styles.btnText}>+ Create Deck</Text>
+      </TouchableOpacity>
+
+      {/* Bottom Sheet (Modal) */}
+      <Modal visible={showSheet} animationType="slide" transparent>
+        <View style={styles.sheet}>
+          <TextInput
+            placeholder="Name"
+            value={newDeck.name}
+            onChangeText={(t) => setNewDeck({ ...newDeck, name: t })}
+            style={styles.input}
+          />
+          <TextInput
+            placeholder="Description"
+            value={newDeck.description}
+            onChangeText={(t) => setNewDeck({ ...newDeck, description: t })}
+            style={styles.input}
+          />
+          <TextInput
+            placeholder="Term Language"
+            value={newDeck.termLang}
+            onChangeText={(t) => setNewDeck({ ...newDeck, termLang: t })}
+            style={styles.input}
+          />
+          <TextInput
+            placeholder="Definition Language"
+            value={newDeck.defLang}
+            onChangeText={(t) => setNewDeck({ ...newDeck, defLang: t })}
+            style={styles.input}
+          />
+
+          <TouchableOpacity style={styles.saveBtn} onPress={addDeck}>
+            <Text style={styles.btnText}>Save</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => setShowSheet(false)}>
+            <Text style={{ textAlign: "center", marginTop: 10, color: "red" }}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 24, fontWeight: 'bold', color:'red'},
+  container: { flex: 1, backgroundColor: "#f7f7f7", padding: 16 },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    gap: 10,
+    marginTop: 30,
+  },
+  search: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 12,
+    padding: 10,
+    backgroundColor: "#fff",
+  },
+  deckCard: {
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    elevation: 2,
+  },
+  deckTitle: { fontSize: 18, fontWeight: "bold" },
+  deckDesc: { fontSize: 14, color: "#666", marginVertical: 6 },
+  deckButtons: { flexDirection: "row", gap: 10 },
+  practiceBtn: {
+    backgroundColor: "#2196F3",
+    padding: 10,
+    borderRadius: 8,
+  },
+  addCardBtn: {
+    backgroundColor: "#4CAF50",
+    padding: 10,
+    borderRadius: 8,
+  },
+  btnText: { color: "#fff", fontWeight: "bold" },
+  createBtn: {
+    backgroundColor: "#FF6B6B",
+    padding: 14,
+    borderRadius: 12,
+    position: "absolute",
+    bottom: 20,
+    alignSelf: "center",
+    width: "90%",
+    alignItems: "center",
+  },
+  sheet: {
+    backgroundColor: "#fff",
+    marginTop: "auto",
+    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    elevation: 10,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+  },
+  saveBtn: {
+    backgroundColor: "#2196F3",
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
 });

@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons'; // ikonlar için
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useColorScheme } from 'react-native';
-
 import CreateDeckScreen from './create-deck';
 import IndexScreen from './index'; // Ana sayfa
 import StatsScreen from './stats';

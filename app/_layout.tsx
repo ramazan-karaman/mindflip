@@ -3,29 +3,28 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
+import { MenuProvider } from 'react-native-popup-menu';
 import 'react-native-reanimated';
-
-import Splash from './splash'; // Splash ekran dosyan
+import Splash from './splash';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [showSplash, setShowSplash] = useState(true);
+  const colorScheme = useColorScheme(); // kullanıcının temasına uyum
+  const [showSplash, setShowSplash]= useState(true);
 
-  useEffect(() => {
-    const timeout = setTimeout(() => setShowSplash(false), 1800); // animasyon süresine göre ayarla
-    return () => clearTimeout(timeout);
-  }, []);
+  useEffect(()=>{
+    const timeout = setTimeout(() => setShowSplash(false), 1800);
+    },[]);
 
-  if (showSplash) {
-    return <Splash />; // splash ekranı göster
+  if(showSplash){
+    return <Splash/>; 
   }
 
-  // Splash bittikten sonra Stack ve Tabs açılır
   return (
+  <MenuProvider>
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -33,5 +32,6 @@ export default function RootLayout() {
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
+  </MenuProvider>
   );
 }

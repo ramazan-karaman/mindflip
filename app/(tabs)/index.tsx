@@ -4,6 +4,7 @@ import { useNavigation } from "@react-navigation/native";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
+  Dimensions,
   FlatList,
   Modal,
   StyleSheet,
@@ -13,6 +14,8 @@ import {
   View,
 } from "react-native";
 import { Menu, MenuOption, MenuOptions, MenuTrigger } from "react-native-popup-menu";
+
+const {width}= Dimensions.get("window");
 
 // Drawer tipleri
 type RootDrawerParamList = {
@@ -205,7 +208,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 20,
     alignSelf: "center",
-    width: "90%",
+    width: width * 0.9,
     alignItems: "center",
   },
   sheet: {

@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-export default function CreateDeckScreen(){
+export default function AddCardScreen(){
     return(
         <View style={styles.container}>
             <Text style={styles.title}>Kart Ekleme Sayfası</Text>

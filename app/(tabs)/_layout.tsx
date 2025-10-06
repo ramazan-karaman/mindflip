@@ -1,56 +1,33 @@
-import { Ionicons } from '@expo/vector-icons'; // ikonlar için
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useColorScheme } from 'react-native';
-import CreateDeckScreen from './create-deck';
-import IndexScreen from './index'; // Ana sayfa
+import { createDrawerNavigator } from '@react-navigation/drawer';
+import AddCardScreen from './addcard';
+import IndexScreen from './index';
 import StatsScreen from './stats';
 
-const Tab = createBottomTabNavigator();
+const Drawer = createDrawerNavigator();
 
-export default function TabsLayout() {
-  const colorScheme = useColorScheme();
-
+export default function DrawerLayout() {
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
+    <Drawer.Navigator
+      screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: colorScheme === 'dark' ? '#2196F3' : '#fff',
-        },
-        tabBarActiveTintColor: '#000000ff',
-        tabBarInactiveTintColor: '#000000ff',
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
-
-          if (route.name === 'index') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'create-deck') {
-            iconName = focused ? 'add-circle' : 'add-circle-outline';
-          } else if (route.name === 'stats') {
-            iconName = focused ? 'bar-chart' : 'bar-chart-outline';
-          } else {
-            iconName = 'ellipse'; // fallback
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-      })}
+        drawerActiveTintColor: '#2196F3',
+      }}
     >
-      <Tab.Screen
+      <Drawer.Screen
         name="index"
         component={IndexScreen}
-        options={{ tabBarLabel: 'Anasayfa' }}
+        options={{ title: "Anasayfa" }}
       />
-      <Tab.Screen
-        name="create-deck"
-        component={CreateDeckScreen}
-        options={{ tabBarLabel: 'Deste Oluştur' }}
+      <Drawer.Screen
+        name="addcard"
+        component={AddCardScreen}
+        options={{ title: "Kart Ekle" }}
       />
-      <Tab.Screen
+      <Drawer.Screen
         name="stats"
         component={StatsScreen}
-        options={{ tabBarLabel: 'İstatistik' }}
+        options={{ title: "İstatistikler" }}
       />
-    </Tab.Navigator>
+    </Drawer.Navigator>
   );
 }

@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { DrawerNavigationProp } from "@react-navigation/drawer";
 import { useNavigation } from "@react-navigation/native";
+import { router } from "expo-router";
 import { useState } from "react";
 import {
   FlatList,
@@ -16,7 +17,7 @@ import { Menu, MenuOption, MenuOptions, MenuTrigger } from "react-native-popup-m
 // Drawer tipleri
 type RootDrawerParamList = {
   index: undefined;
-  "create-deck": undefined;
+  "addcard": undefined;
   stats: undefined;
 };
 
@@ -51,7 +52,7 @@ export default function IndexScreen() {
       { id: Date.now().toString(), name: newDeck.name, description: newDeck.description },
     ]);
     setNewDeck({ name: "", description: "", termLang: "", defLang: "" });
-    setShowSheet(false);
+    setShowSheet(true);
   };
 
   const renderDeck = ({ item }: any) => (
@@ -75,10 +76,13 @@ export default function IndexScreen() {
       <Text style={styles.deckDesc}>{item.description}</Text>
 
       <View style={styles.deckButtons}>
-        <TouchableOpacity style={styles.practiceBtn}>
+        <TouchableOpacity style={styles.practiceBtn}
+        onPress={()=> router.push("/practice")}
+        >
           <Text style={styles.btnText}>Practice</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.addCardBtn}>
+        <TouchableOpacity style={styles.addCardBtn}
+        onPress={()=> router.push("/(tabs)/addcard")}>
           <Text style={styles.btnText}>+ Add Card</Text>
         </TouchableOpacity>
       </View>

@@ -1,16 +1,13 @@
-import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { Animated, Dimensions, StyleSheet, Text, View } from "react-native";
 
 
-const {width, height} = Dimensions.get("window"); // ekranın genişliğini öğrenme
+const { width, height } = Dimensions.get("window"); // ekranın genişliğini öğrenme
 
-export default function Splash(){
-    const router = useRouter(); //ekran yönlendirme
-    const flipAnim= useRef(new Animated.Value(0)).current; // animasyon kontrol
-    const [flipped, setFlipped] = useState(false); //flipped durumu , setFlipped durumu değiştirme
+export default function Splash() {
+    const flipAnim = useRef(new Animated.Value(0)).current; // animasyon kontrol
 
-    useEffect(() =>{
+    useEffect(() => {
         Animated.timing(flipAnim, {
             toValue: 180, //flipanimin gelmesini istediğim değer
             duration: 1000, //değere ulaşma süresi
@@ -18,26 +15,26 @@ export default function Splash(){
         }).start();
     }, []);
 
-    const frontInterpolate= flipAnim.interpolate({ //sayısal değeri deg değere çevirme
+    const frontInterpolate = flipAnim.interpolate({ //sayısal değeri deg değere çevirme
         inputRange: [0, 180],
         outputRange: ["0deg", "180deg"],// kartı ön yüzden arkaya çevirme
     });
 
-    const backInterpolate= flipAnim.interpolate({
+    const backInterpolate = flipAnim.interpolate({
         inputRange: [0, 180],
         outputRange: ["180deg", "360deg"],// kartı arka yüzden öne çevirme
     });
 
-    return(
+    return (
         <View style={styles.container}>
             <Animated.View
-            style={[
-                styles.card,
-                {
-                    transform: [{rotateY: frontInterpolate}],
-                    position: "absolute",
-                }
-            ]}
+                style={[
+                    styles.card,
+                    {
+                        transform: [{ rotateY: frontInterpolate }],
+                        position: "absolute",
+                    }
+                ]}
             >
                 <Text style={styles.text}>MIND</Text>
             </Animated.View>
@@ -45,12 +42,12 @@ export default function Splash(){
                 style={[
                     styles.card,
                     {
-                        transform: [{rotateY: backInterpolate}],
+                        transform: [{ rotateY: backInterpolate }],
                         position: "absolute",
                         backgroundColor: "#4CAF50",
                     },
                 ]}
-                >
+            >
                 <Text style={styles.text}>FLIP</Text>
             </Animated.View>
         </View>
@@ -58,7 +55,7 @@ export default function Splash(){
 }
 
 const styles = StyleSheet.create({
-    container:{
+    container: {
         flex: 1,
         backgroundColor: "#fff",
         alignItems: "center",

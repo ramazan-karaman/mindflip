@@ -20,7 +20,7 @@ const {width}= Dimensions.get("window");
 // Drawer tipleri
 type RootDrawerParamList = {
   index: undefined;
-  "addcard": undefined;
+  addcard: undefined;
   stats: undefined;
 };
 
@@ -36,12 +36,10 @@ export default function IndexScreen() {
   const [search, setSearch] = useState("");
   const [showSheet, setShowSheet] = useState(false);
 
-  // Bottom sheet form state
+  // Bottom sheet durumu
   const [newDeck, setNewDeck] = useState({
     name: "",
     description: "",
-    termLang: "",
-    defLang: "",
   });
 
   const filteredDecks = decks.filter((d) =>
@@ -54,7 +52,7 @@ export default function IndexScreen() {
       ...decks,
       { id: Date.now().toString(), name: newDeck.name, description: newDeck.description },
     ]);
-    setNewDeck({ name: "", description: "", termLang: "", defLang: "" });
+    setNewDeck({ name: "", description: ""});
     setShowSheet(true);
   };
 
@@ -69,9 +67,9 @@ export default function IndexScreen() {
             <Ionicons name="ellipsis-vertical" size={20} color="#333" />
           </MenuTrigger>
           <MenuOptions>
-            <MenuOption onSelect={() => alert("Edit " + item.name)} text="Edit" />
-            <MenuOption onSelect={() => alert("Remove " + item.name)} text="Remove" />
-            <MenuOption onSelect={() => alert(item.name + " Count: 20")} text="Count" />
+            <MenuOption onSelect={() => alert("Düzenle " + item.name)} text="Düzenle" />
+            <MenuOption onSelect={() => alert("Sil " + item.name)} text="Sil" />
+            <MenuOption onSelect={() => alert(item.name + " Hedef: 20")} text="Hedef" />
           </MenuOptions>
         </Menu>
       </View>
@@ -82,11 +80,11 @@ export default function IndexScreen() {
         <TouchableOpacity style={styles.practiceBtn}
         onPress={()=> router.push("/practice")}
         >
-          <Text style={styles.btnText}>Practice</Text>
+          <Text style={styles.btnText}>Pratikler</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.addCardBtn}
         onPress={()=> router.push("/(tabs)/addcard")}>
-          <Text style={styles.btnText}>+ Add Card</Text>
+          <Text style={styles.btnText}>+ Kart Ekle</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -97,7 +95,7 @@ export default function IndexScreen() {
       {/* Search bar + Hamburger */}
       <View style={styles.searchRow}>
         <TouchableOpacity onPress={() => navigation.openDrawer()}>
-          <Ionicons name="menu" size={28} color="#333" />
+          <Ionicons name="menu" size={35} color="#333" />
         </TouchableOpacity>
         <TextInput
           placeholder="Search..."
@@ -117,34 +115,22 @@ export default function IndexScreen() {
 
       {/* Create Deck Button */}
       <TouchableOpacity style={styles.createBtn} onPress={() => setShowSheet(true)}>
-        <Text style={styles.btnText}>+ Create Deck</Text>
+        <Text style={styles.btnText}>+ Deste Oluştur</Text>
       </TouchableOpacity>
 
       {/* Bottom Sheet (Modal) */}
       <Modal visible={showSheet} animationType="slide" transparent>
         <View style={styles.sheet}>
           <TextInput
-            placeholder="Name"
+            placeholder="İsim"
             value={newDeck.name}
             onChangeText={(t) => setNewDeck({ ...newDeck, name: t })}
             style={styles.input}
           />
           <TextInput
-            placeholder="Description"
+            placeholder="Açıklama"
             value={newDeck.description}
             onChangeText={(t) => setNewDeck({ ...newDeck, description: t })}
-            style={styles.input}
-          />
-          <TextInput
-            placeholder="Term Language"
-            value={newDeck.termLang}
-            onChangeText={(t) => setNewDeck({ ...newDeck, termLang: t })}
-            style={styles.input}
-          />
-          <TextInput
-            placeholder="Definition Language"
-            value={newDeck.defLang}
-            onChangeText={(t) => setNewDeck({ ...newDeck, defLang: t })}
             style={styles.input}
           />
 
@@ -189,7 +175,7 @@ const styles = StyleSheet.create({
   },
   deckTitle: { fontSize: 18, fontWeight: "bold" },
   deckDesc: { fontSize: 14, color: "#666", marginVertical: 6 },
-  deckButtons: { flexDirection: "row", gap: 10 },
+  deckButtons: { flexDirection: "row", gap: 20 },
   practiceBtn: {
     backgroundColor: "#2196F3",
     padding: 10,

@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  Dimensions,
   StyleSheet,
   Text,
   TextInput,
@@ -13,6 +14,8 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+
+const { width, height } = Dimensions.get("window");
 
 // type tanımlaması
 type PracticeRoute =
@@ -37,7 +40,7 @@ export default function PracticeScreen() {
   const [search, setSearch] = useState("");
 
   const handlePress = (route: PracticeRoute) => {
-    router.push(route); 
+    router.push(route);
   };
 
   return (
@@ -105,7 +108,7 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
     borderRadius: 10,
     padding: 8,
-    width: "70%",
+    width: width * 0.7,
     backgroundColor: "#fff",
   },
   grid: {
@@ -114,8 +117,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   card: {
-    width: "45%",
-    height: 120,
+    width: width * 0.42,
+    height: height * 0.15,
     borderRadius: 16,
     marginBottom: 16,
     justifyContent: "center",

@@ -61,7 +61,7 @@ export default function IndexScreen() {
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         <Text style={styles.deckTitle}>{item.name}</Text>
 
-        {/* Overflow Menu */}
+
         <Menu>
           <MenuTrigger>
             <Ionicons name="ellipsis-vertical" size={20} color="#333" />
@@ -92,7 +92,7 @@ export default function IndexScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Search bar + Hamburger */}
+
       <View style={styles.searchRow}>
         <TouchableOpacity onPress={() => navigation.openDrawer()}>
           <Ionicons name="menu" size={35} color="#333" />
@@ -105,7 +105,6 @@ export default function IndexScreen() {
         />
       </View>
 
-      {/* Deck List */}
       <FlatList
         data={filteredDecks}
         keyExtractor={(item) => item.id}
@@ -113,12 +112,12 @@ export default function IndexScreen() {
         contentContainerStyle={{ paddingBottom: 80 }}
       />
 
-      {/* Create Deck Button */}
+      
       <TouchableOpacity style={styles.createBtn} onPress={() => setShowSheet(true)}>
         <Text style={styles.btnText}>+ Deste Oluştur</Text>
       </TouchableOpacity>
 
-      {/* Bottom Sheet (Modal) */}
+      
       <Modal visible={showSheet} animationType="slide" transparent>
         <View style={styles.sheet}>
           <TextInput

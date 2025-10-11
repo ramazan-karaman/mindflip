@@ -52,7 +52,7 @@ export default function IndexScreen() {
       ...decks,
       { id: Date.now().toString(), name: newDeck.name, description: newDeck.description },
     ]);
-    setNewDeck({ name: "", description: ""});
+      setNewDeck({ name: "", description: ""});
     setShowSheet(true);
   };
 

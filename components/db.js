@@ -213,3 +213,17 @@ export const deletePractice = async (db, id) => {
   const query = `DELETE FROM practices WHERE id=?;`;
   await db.executeSql(query, [id]);
 };
+
+// Destedeki kart sayısını alma
+export const getCardCountForDeck = async (db, deck_id) => {
+  try {
+    const results = await db.executeSql('SELECT COUNT(*) as count FROM cards WHERE deck_id = ?;', [deck_id]);
+    if (results[0].length > 0) {
+      return results[0].rows.item(0).count;
+    }
+    return 0;
+  } catch (error) {
+    console.error("Kart sayısı alınırken hata oluştu:", error);
+    throw new Error("Kart sayısı alınamıyor");
+  }
+};

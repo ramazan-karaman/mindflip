@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import { MenuProvider } from 'react-native-popup-menu';
 import 'react-native-reanimated';
-import { createTables, getDBConnection } from '../components/db';
+import { createTables } from '../components/db';
 import Splash from './splash';
 
 export const unstable_settings = {
@@ -14,26 +14,24 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme(); // kullanıcının temasına uyum
-  const [showSplash, setShowSplash]= useState(true);
+  const [isReady, setIsReady]= useState(false);
 
   useEffect(()=>{
     const initializeDB = async()=>{
       try{
-        const db = await getDBConnection();
-        await createTables(db);
+        await createTables();
         console.log("Database başarıyla oluşturuldu veya zaten mevcut.");
       }catch(error){
         console.error("Database oluşturulurken hata oluştu:", error);
+      } finally{
+        setIsReady(true);
       }
     };
     initializeDB();
   },[]); // sadece bir kez çalışır
 
-  useEffect(()=>{
-    const timeout = setTimeout(() => setShowSplash(false), 1800);
-    },[]);
 
-  if(showSplash){
+  if(!isReady){
     return <Splash/>; 
   }
 
@@ -43,6 +41,8 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen 
+            name="addcard" options={{ presentation: 'modal', title: 'Yeni Kart Ekle' }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />

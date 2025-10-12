@@ -1,5 +1,4 @@
 import { createDrawerNavigator } from '@react-navigation/drawer';
-import AddCardScreen from './addcard';
 import IndexScreen from './index';
 import StatsScreen from './stats';
 
@@ -17,11 +16,6 @@ export default function DrawerLayout() {
         name="index"
         component={IndexScreen}
         options={{ title: "Anasayfa" }}
-      />
-      <Drawer.Screen
-        name="addcard"
-        component={AddCardScreen}
-        options={{ title: "Kart Ekle" }}
       />
       <Drawer.Screen
         name="stats"

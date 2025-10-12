@@ -16,7 +16,7 @@ import {
   View,
 } from "react-native";
 import { Menu, MenuOption, MenuOptions, MenuTrigger } from "react-native-popup-menu";
-import { deleteDeck, getCardCountForDeck, getDBConnection, getDecks, insertDeck, updateDeck } from "../../components/db";
+import { deleteDeck, getCardCountForDeck, getDecks, insertDeck, updateDeck } from "../../components/db";
 
 interface Deck {
   id: number;
@@ -56,8 +56,7 @@ export default function IndexScreen() {
 
   const loadDecks = useCallback(async () => {
     try {
-      const db = await getDBConnection();
-      const fetchedDecks = await getDecks(db);
+      const fetchedDecks = await getDecks();
       setDecks(fetchedDecks);
     } catch (error) {
       console.error("Deste yüklenirken hata oluştu:", error);
@@ -75,9 +74,8 @@ export default function IndexScreen() {
       return;
     }
     try {
-      const db = getDBConnection();
       // user id 1 olarak hedef 0 yapıldı
-      await insertDeck(db, 1, newDeck.name, newDeck.description, 0, new Date().toISOString());
+      await insertDeck( 1, newDeck.name, newDeck.description, 0, new Date().toISOString());
       setNewDeck({ name: "", description: "" });
       setShowSheet(false);
       loadDecks(); // yeni desteleri yükle
@@ -97,8 +95,7 @@ export default function IndexScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              const db = await getDBConnection();
-              await deleteDeck(db, id);
+              await deleteDeck(id);
               loadDecks(); // desteleri yeniden yükle
             } catch (error) {
               console.error("Deste silinirken hata oluştu:", error);
@@ -111,8 +108,7 @@ export default function IndexScreen() {
 
   const handleOpenGoalSheet = async (deck: Deck) => {
     try {
-      const db = await getDBConnection();
-      const cardCount = await getCardCountForDeck(db, deck.id);
+      const cardCount = await getCardCountForDeck(deck.id);
       if (cardCount < 5) {
         Alert.alert("Yetersiz kart", "Hedef belirlemek için en az 5 kart eklenmelidir.");
         return;
@@ -130,8 +126,7 @@ export default function IndexScreen() {
   const handleSaveGoal = async () => {
     if(!selectedDeck) return;
     try {
-      const db = await getDBConnection();
-      await updateDeck(db, selectedDeck.id, selectedDeck.name, selectedDeck.description, Math.round(currentGoal));
+      await updateDeck(selectedDeck.id, selectedDeck.name, selectedDeck.description, Math.round(currentGoal));
 
       setIsGoalModalVisible(false);
       setSelectedDeck(null);
@@ -166,7 +161,7 @@ export default function IndexScreen() {
         <TouchableOpacity style={styles.practiceBtn} onPress={() => router.push("/practice")}>
           <Text style={styles.btnText}>Pratikler</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.addCardBtn} onPress={() => router.push("/(tabs)/addcard")}>
+        <TouchableOpacity style={styles.addCardBtn} onPress={() => router.push(`/addcard?deckId=${item.id}`)}>
           <Text style={styles.btnText}>+ Kart Ekle</Text>
         </TouchableOpacity>
       </View>

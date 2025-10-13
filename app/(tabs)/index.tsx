@@ -149,7 +149,7 @@ export default function IndexScreen() {
             <Ionicons name="ellipsis-vertical" size={20} color="#333" />
           </MenuTrigger>
           <MenuOptions>
-            <MenuOption onSelect={() => alert("Düzenle " + item.name)} text="Düzenle" />
+            <MenuOption onSelect={() => router.push(`/editDeck?deckId=${item.id}`)} text="Düzenle" />
             <MenuOption onSelect={() => handleDeleteDeck(item.id, item.name)} text="Sil" />
             <MenuOption onSelect={() => handleOpenGoalSheet(item)} text="Hedef" />
           </MenuOptions>

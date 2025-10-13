@@ -43,6 +43,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen 
             name="addcard" options={{ presentation: 'modal', title: 'Yeni Kart Ekle' }} />
+        <Stack.Screen name="editDeck" options={{ presentation: 'modal', title: 'Desteyi Düzenle' }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />

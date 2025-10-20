@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -6,25 +5,13 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
-  View,
+  View
 } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import PracticeModeCard from "../components/practiceModeCard";
+import { PracticeRoute } from "../types/entities";
 
 const { width, height } = Dimensions.get("window");
 
-// type tanımlaması
-type PracticeRoute =
-  | "/pratik/classic"
-  | "/pratik/match"
-  | "/pratik/truefalse"
-  | "/pratik/order"
-  | "/pratik/multiple"
-  | "/pratik/random";
 
 const practiceModes = [
   { id: "1", title: "Klasik", route: "/pratik/classic" as const, color: "#2196F3", icon: "book" },
@@ -37,7 +24,7 @@ const practiceModes = [
 
 export default function PracticeScreen() {
   const router = useRouter();
-  const {deckId}= useLocalSearchParams<{deckId: string}>();
+  const { deckId } = useLocalSearchParams<{ deckId: string }>();
   const [search, setSearch] = useState("");
 
   const handlePress = (route: PracticeRoute) => {
@@ -57,42 +44,19 @@ export default function PracticeScreen() {
       </View>
 
       <View style={styles.grid}>
-        {practiceModes.map((mode) => {
-          const scale = useSharedValue(1);
-
-          const animatedStyle = useAnimatedStyle(() => ({
-            transform: [{ scale: scale.value }],
-          }));
-
-          const onCardPress = () => {
-            // önce animasyon
-            scale.value = withTiming(1.05, { duration: 150 }, () => {
-              scale.value = withTiming(1, { duration: 150 });
-            });
-            // sonra küçük delay ile yönlendirme
-            setTimeout(() => handlePress(mode.route), 200);
-          };
-
-          return (
-            <Animated.View
-              key={mode.id}
-              style={[styles.card, { backgroundColor: mode.color }, animatedStyle]}
-            >
-              <TouchableOpacity onPress={onCardPress} style={styles.cardBtn}>
-                <Ionicons
-                  name={mode.icon as any}
-                  size={28}
-                  color="#fff"
-                  style={{ marginBottom: 8 }}
-                />
-                <Text style={styles.cardText}>{mode.title}</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          );
-        })}
+        {practiceModes.map((mode) => (
+          <PracticeModeCard
+            key={mode.id}
+            title={mode.title}
+            route={mode.route}
+            color={mode.color}
+            icon={mode.icon}
+            onPress={handlePress}
+          />
+        ))}
       </View>
     </View>
-  );
+  )
 }
 
 const styles = StyleSheet.create({
@@ -116,25 +80,5 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-  },
-  card: {
-    width: width * 0.42,
-    height: height * 0.15,
-    borderRadius: 16,
-    marginBottom: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  cardBtn: { flex: 1, justifyContent: "center", alignItems: "center" },
-  cardText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-    textAlign: "center",
   },
 });

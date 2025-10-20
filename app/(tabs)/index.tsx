@@ -158,7 +158,7 @@ export default function IndexScreen() {
 
       <Text style={styles.deckDesc}>{item.description}</Text>
       <View style={styles.deckButtons}>
-        <TouchableOpacity style={styles.practiceBtn} onPress={() => router.push("/practice")}>
+        <TouchableOpacity style={styles.practiceBtn} onPress={() => router.push(`/practice?deckId=${item.id}`)}>
           <Text style={styles.btnText}>Pratikler</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.addCardBtn} onPress={() => router.push(`/addcard?deckId=${item.id}`)}>
@@ -217,7 +217,7 @@ export default function IndexScreen() {
       {/* Deck List */}
       <FlatList
         data={filteredDecks}
-        keyExtractor={(item) => item.id.toString()} // id'nin string olduğundan emin olalım
+        keyExtractor={(item) => item.id.toString()} // id'nin string olduğundan emin olma
         renderItem={renderDeck}
         contentContainerStyle={{ paddingBottom: 80 }}
       />

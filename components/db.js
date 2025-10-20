@@ -13,11 +13,10 @@ const db = openDatabase();
 
 // --- Tablo Oluşturma ---
 export const createTables = async () => {
-    // execAsync ile birden çok sorguyu tek seferde çalıştırabiliriz.
     await db.execAsync(`
         CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, password TEXT, profile_photo TEXT);
         CREATE TABLE IF NOT EXISTS decks (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, name TEXT, description TEXT, goal INTEGER, created_at TEXT, FOREIGN KEY(user_id) REFERENCES users(id));
-        CREATE TABLE IF NOT EXISTS cards (id INTEGER PRIMARY KEY AUTOINCREMENT, deck_id INTEGER, front_word TEXT, front_image TEXT, back_word TEXT, back_image TEXT, rating TEXT, created_at TEXT, FOREIGN KEY(deck_id) REFERENCES decks(id));
+        CREATE TABLE IF NOT EXISTS cards (id INTEGER PRIMARY KEY AUTOINCREMENT, deck_id INTEGER, front_word TEXT, front_image TEXT, back_word TEXT, back_image TEXT, rating TEXT, created_at TEXT,interval REAL DEFAULT 1,easeFactor REAL DEFAULT 2.5,nextReview TEXT, FOREIGN KEY(deck_id) REFERENCES decks(id));
         CREATE TABLE IF NOT EXISTS statistics (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, date TEXT, studied_card_count INTEGER, added_card_count INTEGER, learned_card_count INTEGER, spent_time INTEGER, practice_success_rate REAL, deck_success_rate REAL, FOREIGN KEY(user_id) REFERENCES users(id));
         CREATE TABLE IF NOT EXISTS practices (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, deck_id INTEGER, date TEXT, duration INTEGER, success_rate REAL, FOREIGN KEY(user_id) REFERENCES users(id), FOREIGN KEY(deck_id) REFERENCES decks(id));
     `);
@@ -57,8 +56,9 @@ export const deleteDeck = (id) => db.runAsync(`DELETE FROM decks WHERE id=?;`, [
 
 // --- CARDS CRUD ---
 export const insertCard = (deck_id, front_word, front_image, back_word, back_image, rating, created_at) => {
-    const query = `INSERT INTO cards (deck_id, front_word, front_image, back_word, back_image, rating, created_at) VALUES (?, ?, ?, ?, ?, ?, ?);`;
-    return db.runAsync(query, [deck_id, front_word, front_image, back_word, back_image, rating, created_at]);
+    const nextReview = new Date().toISOString();
+    const query = `INSERT INTO cards (deck_id, front_word, front_image, back_word, back_image, rating, created_at, nextReview) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`;
+    return db.runAsync(query, [deck_id, front_word, front_image, back_word, back_image, rating, created_at, nextReview]);
 };
 
 export const getCards = (deck_id) => db.getAllAsync('SELECT * FROM cards WHERE deck_id=?;', [deck_id]);
@@ -68,6 +68,11 @@ export const updateCard = (id, front_word, front_image, back_word, back_image, r
     return db.runAsync(query, [front_word, front_image, back_word, back_image, rating, id]);
 };
 
+export const updateCardSRS = (id, interval, easeFactor, nextReview) => {
+    const query = `UPDATE cards SET interval=?, easeFactor=?, nextReview=? WHERE id=?;`;
+    return db.runAsync(query, [interval, easeFactor, nextReview, id]);
+};
+
 export const deleteCard = (id) => db.runAsync(`DELETE FROM cards WHERE id=?;`, [id]);
 
 export const getCardCountForDeck = async (deck_id) => {
@@ -75,7 +80,6 @@ export const getCardCountForDeck = async (deck_id) => {
     return result?.count || 0;
 };
 
-// --- STATISTICS & PRACTICES CRUD (Aynı mantıkla devam ediyor) ---
 
 export const insertStatistic = (user_id, date, studied_card_count, added_card_count, learned_card_count, spent_time, practice_success_rate, deck_success_rate) => {
     const query = `INSERT INTO statistics (user_id, date, studied_card_count, added_card_count, learned_card_count, spent_time, practice_success_rate, deck_success_rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`;
@@ -84,4 +88,3 @@ export const insertStatistic = (user_id, date, studied_card_count, added_card_co
 
 export const getStatistics = (user_id) => db.getAllAsync('SELECT * FROM statistics WHERE user_id=?;', [user_id]);
 
-// ... Diğer tüm fonksiyonlar için de bu basit yapı geçerlidir.

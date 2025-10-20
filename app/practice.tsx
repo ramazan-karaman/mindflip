@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   Dimensions,
@@ -37,10 +37,11 @@ const practiceModes = [
 
 export default function PracticeScreen() {
   const router = useRouter();
+  const {deckId}= useLocalSearchParams<{deckId: string}>();
   const [search, setSearch] = useState("");
 
   const handlePress = (route: PracticeRoute) => {
-    router.push(route);
+    router.push(`${route}?deckId=${deckId}`);
   };
 
   return (

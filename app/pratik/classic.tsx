@@ -2,7 +2,7 @@ import { useLocalSearchParams, useNavigation } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { getCards, updateCardSRS } from '../../components/db'; // ../../components/db olmalı, yolu kontrol et
+import { getCards, updateCardSRS } from '../../components/db';
 
 interface Card {
     id: number;

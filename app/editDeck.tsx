@@ -2,20 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { deleteCard, getCards, getDecks, updateDeck } from '../components/db'; // getDecks'i de import ediyoruz
-
-// Deste ve Kart tipleri için interface'ler
-interface Card {
-    id: number;
-    front_word: string;
-    back_word: string;
-}
-interface Deck {
-    id: number;
-    name: string;
-    description: string;
-    goal: number;
-}
+import { deleteCard, getCardsByDeckId } from '../lib/services/cardService';
+import { getDeckById, updateDeck } from '../lib/services/deckService';
+import { Card, Deck } from '../types/entities';
 
 export default function EditDeckScreen() {
     const { deckId } = useLocalSearchParams();
@@ -29,14 +18,14 @@ export default function EditDeckScreen() {
     const loadData = useCallback(async () => {
         if (!deckId) return;
         try {
-            const allDecks: Deck[] = await getDecks();
-            const currentDeck = allDecks.find(d => d.id === parseInt(deckId as string));
+            const id= parseInt(deckId as string);
+            const currentDeck = await getDeckById(id);
             if (currentDeck) {
                 setDeck(currentDeck);
                 setDeckName(currentDeck.name);
                 setDeckDescription(currentDeck.description);
             }
-            const fetchedCards = await getCards(parseInt(deckId as string));
+            const fetchedCards = await getCardsByDeckId(parseInt(deckId as string));
             setCards(fetchedCards);
         } catch (error) {
             console.error("Veri yüklenirken hata:", error);

@@ -13,7 +13,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { insertCard } from "../components/db";
+import { insertCard } from "../lib/services/cardService";
 
 export default function AddCardScreen() {
 
@@ -95,9 +95,7 @@ export default function AddCardScreen() {
                 frontWord,
                 frontImage,
                 backWord,
-                backImage,
-                'new', // Başlangıç rating'i
-                new Date().toISOString()
+                backImage
             );
 
             Alert.alert("Başarılı", "Kart desteye eklendi!");

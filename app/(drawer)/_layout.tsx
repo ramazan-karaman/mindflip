@@ -2,6 +2,11 @@ import { createDrawerNavigator } from '@react-navigation/drawer';
 import IndexScreen from './index';
 import StatsScreen from './stats';
 
+export type RootDrawerParamList = {
+  index: undefined;
+  stats: undefined;
+};
+
 const Drawer = createDrawerNavigator();
 
 export default function DrawerLayout() {

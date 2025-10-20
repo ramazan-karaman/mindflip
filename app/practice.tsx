@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dimensions,
   StyleSheet,
@@ -8,6 +8,7 @@ import {
   View
 } from "react-native";
 import PracticeModeCard from "../components/practiceModeCard";
+import { getDeckById } from "../lib/services/deckService";
 import { PracticeRoute } from "../types/entities";
 
 const { width, height } = Dimensions.get("window");
@@ -26,6 +27,26 @@ export default function PracticeScreen() {
   const router = useRouter();
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
   const [search, setSearch] = useState("");
+  const [deckName, setDeckName] = useState("Deste Yükleniyor...");
+
+  useEffect(() => {
+    const loadDeckInfo = async () => {
+      if (deckId) {
+        try {
+          const deck = await getDeckById(parseInt(deckId));
+          if (deck) {
+            setDeckName(deck.name);
+          } else {
+            setDeckName("Bilinmeyen Deste");
+          }
+        } catch (error) {
+          console.error("Deste bilgisi alınırken hata:", error);
+          setDeckName("Hata");
+      }
+    }
+  };
+  loadDeckInfo();
+  }, [deckId]);
 
   const handlePress = (route: PracticeRoute) => {
     router.push(`${route}?deckId=${deckId}`);
@@ -34,7 +55,7 @@ export default function PracticeScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.deckName}>Deste 1</Text>
+        <Text style={styles.deckName}>{deckName}</Text>
         <TextInput
           placeholder="Search..."
           style={styles.search}

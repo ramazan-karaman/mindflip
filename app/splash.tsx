@@ -1,55 +1,37 @@
-import React, { useEffect, useRef } from "react";
-import { Animated, Dimensions, StyleSheet, Text, View } from "react-native";
-
+import React, { useEffect } from "react";
+import { Dimensions, StyleSheet, Text, View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 const { width, height } = Dimensions.get("window"); // ekranın genişliğini öğrenme
 
 export default function Splash() {
-    const flipAnim = useRef(new Animated.Value(0)).current; // animasyon kontrol
+    const flipAnim = useSharedValue(0); // animasyon kontrol
 
     useEffect(() => {
-        Animated.timing(flipAnim, {
-            toValue: 180, //flipanimin gelmesini istediğim değer
-            duration: 1000, //değere ulaşma süresi
-            useNativeDriver: true, // cihazın motoruyla kullanma (akıcılık)
-        }).start();
+        flipAnim.value = withTiming(180, { duration: 1200 });
     }, []);
 
-    const frontInterpolate = flipAnim.interpolate({ //sayısal değeri deg değere çevirme
-        inputRange: [0, 180],
-        outputRange: ["0deg", "180deg"],// kartı ön yüzden arkaya çevirme
+    const frontAnimatedStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{ rotateY: `${flipAnim.value}deg` }],
+        };
     });
 
-    const backInterpolate = flipAnim.interpolate({
-        inputRange: [0, 180],
-        outputRange: ["180deg", "360deg"],// kartı arka yüzden öne çevirme
+    const backAnimatedStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{ rotateY: `${flipAnim.value + 180}deg` }],
+        };
     });
 
     return (
         <View style={styles.container}>
-            <Animated.View
-                style={[
-                    styles.card,
-                    {
-                        transform: [{ rotateY: frontInterpolate }],
-                        position: "absolute",
-                    }
-                ]}
-            >
+            <Animated.View style={[styles.card, styles.frontCard, frontAnimatedStyle]}>
                 <Text style={styles.text}>MIND</Text>
             </Animated.View>
-            <Animated.View
-                style={[
-                    styles.card,
-                    {
-                        transform: [{ rotateY: backInterpolate }],
-                        position: "absolute",
-                        backgroundColor: "#4CAF50",
-                    },
-                ]}
-            >
+            <Animated.View style={[styles.card, styles.backCard, backAnimatedStyle]}>
                 <Text style={styles.text}>FLIP</Text>
             </Animated.View>
+                <Text style={styles.text}>FLIP</Text>
         </View>
     );
 }
@@ -69,6 +51,13 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         borderRadius: 20,
         backfaceVisibility: "hidden",
+        position: "absolute",
+    },
+    frontCard: {
+        backgroundColor: "#2196F3",
+    },
+    backCard: {
+        backgroundColor: "#4CAF50",
     },
     text: {
         fontSize: 32,

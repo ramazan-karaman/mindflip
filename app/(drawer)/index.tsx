@@ -16,25 +16,13 @@ import {
   View,
 } from "react-native";
 import { Menu, MenuOption, MenuOptions, MenuTrigger } from "react-native-popup-menu";
-import { deleteDeck, getCardCountForDeck, getDecks, insertDeck, updateDeck } from "../../components/db";
-
-interface Deck {
-  id: number;
-  name: string;
-  description: string;
-  user_id: number;
-  created_at: string;
-  goal: number;
-}
+import { getCardCountForDeck } from "../../lib/services/cardService";
+import { deleteDeck, getDecks, insertDeck, updateDeck } from "../../lib/services/deckService";
+import { Deck } from "../../types/entities";
+import { RootDrawerParamList } from "./_layout";
 
 const { width } = Dimensions.get("window");
 
-// Drawer tipleri
-type RootDrawerParamList = {
-  index: undefined;
-  addcard: undefined;
-  stats: undefined;
-};
 
 
 
@@ -75,7 +63,7 @@ export default function IndexScreen() {
     }
     try {
       // user id 1 olarak hedef 0 yapıldı
-      await insertDeck( 1, newDeck.name, newDeck.description, 0, new Date().toISOString());
+      await insertDeck( 1, newDeck.name, newDeck.description, 0);
       setNewDeck({ name: "", description: "" });
       setShowSheet(false);
       loadDecks(); // yeni desteleri yükle

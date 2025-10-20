@@ -2,7 +2,7 @@ import { useLocalSearchParams, useNavigation } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { getCards, updateCardSRS } from '../../components/db';
+import { getCardsByDeckId, updateCardSRS } from '../../lib/services/cardService';
 
 interface Card {
     id: number;
@@ -63,7 +63,7 @@ export default function ClassicScreen() {
         const loadCardsToPractice = async () => {
             if (!deckId) return;
             try {
-                const allCards: Card[] = await getCards(parseInt(deckId as string));
+                const allCards: Card[] = await getCardsByDeckId(parseInt(deckId as string));
                 const now = new Date();
                 
                 const dueCards = allCards

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { deleteCard, getCardsByDeckId } from '../lib/services/cardService';
 import { getDeckById, updateDeck } from '../lib/services/deckService';
 import { Card, Deck } from '../types/entities';
@@ -14,11 +14,13 @@ export default function EditDeckScreen() {
     const [cards, setCards] = useState<Card[]>([]);
     const [deckName, setDeckName] = useState('');
     const [deckDescription, setDeckDescription] = useState('');
+    const [loading, setLoading] = useState(true);
 
     const loadData = useCallback(async () => {
         if (!deckId) return;
+        setLoading(true);
         try {
-            const id= parseInt(deckId as string);
+            const id = parseInt(deckId as string);
             const currentDeck = await getDeckById(id);
             if (currentDeck) {
                 setDeck(currentDeck);
@@ -29,6 +31,9 @@ export default function EditDeckScreen() {
             setCards(fetchedCards);
         } catch (error) {
             console.error("Veri yüklenirken hata:", error);
+        }
+        finally {
+            setLoading(false);
         }
     }, [deckId]);
 
@@ -41,7 +46,7 @@ export default function EditDeckScreen() {
         try {
             await updateDeck(deck.id, deckName, deckDescription, deck.goal); // goal'u korumak için deck.goal kullanıldı
             Alert.alert("Başarılı", "Deste bilgileri güncellendi.");
-            navigation.goBack(); 
+            navigation.goBack();
         } catch (error) {
             console.error("Deste güncellenirken hata:", error);
             Alert.alert("Hata", "Deste güncellenemedi.");
@@ -76,16 +81,23 @@ export default function EditDeckScreen() {
                 <Text style={styles.cardTextFront}>{item.front_word}</Text>
                 <Text style={styles.cardTextBack}>{item.back_word}</Text>
             </View>
+            {(item.front_image || item.back_image) && (
+                <Ionicons name="image" size={20} color="#ccc" style={{ marginRight: 15 }} />
+            )}
             <TouchableOpacity onPress={() => handleDeleteCard(item.id)}>
                 <Ionicons name="trash-bin-outline" size={24} color="#ff4d4d" />
             </TouchableOpacity>
         </View>
     );
-
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#2196F3" />
+            </View>
+        );
+    }
     return (
         <ScrollView style={styles.container}>
-            <Text style={styles.headerTitle}>Deste Düzenle</Text>
-            
             <View style={styles.deckInfoContainer}>
                 <TextInput
                     style={styles.input}
@@ -106,12 +118,18 @@ export default function EditDeckScreen() {
             </View>
 
             <Text style={styles.cardsHeader}>Kartlar ({cards.length})</Text>
-            
+
             <FlatList
                 data={cards}
                 renderItem={renderCardItem}
                 keyExtractor={(item) => item.id.toString()}
                 scrollEnabled={false} // ScrollView içinde olduğu için
+                ListEmptyComponent={() => (
+                    <View style={styles.emptyCardsContainer}>
+                        <Text style={styles.emptyCardsText}>Bu destede henüz hiç kart yok.</Text>
+                        <Text style={styles.emptyCardsSubText}>Ana sayfadan '+ Kart Ekle' butonunu kullanabilirsin.</Text>
+                    </View>
+                )}
             />
         </ScrollView>
     );
@@ -122,13 +140,6 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: 20,
         backgroundColor: '#f7f7f7',
-    },
-    headerTitle: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        textAlign: 'center',
-        marginBottom: 20,
-        color: '#333',
     },
     deckInfoContainer: {
         backgroundColor: 'white',
@@ -186,5 +197,29 @@ const styles = StyleSheet.create({
     cardTextBack: {
         fontSize: 14,
         color: '#666',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#f7f7f7',
+    },
+    emptyCardsContainer: {
+        padding: 20,
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        marginTop: 10,
+    },
+    emptyCardsText: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#888',
+    },
+    emptyCardsSubText: {
+        fontSize: 14,
+        color: '#aaa',
+        textAlign: 'center',
+        marginTop: 6,
     },
 });

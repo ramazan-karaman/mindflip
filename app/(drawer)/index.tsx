@@ -33,8 +33,8 @@ export default function IndexScreen() {
   const [showSheet, setShowSheet] = useState(false);
   const [isGoalModalVisible, setIsGoalModalVisible] = useState(false);
   const [selectedDeck, setSelectedDeck] = useState<Deck | null>(null);
-  const[currentGoal,setCurrentGoal]=useState(1);
-  const[maxGoal,setMaxGoal]=useState(1);
+  const [currentGoal, setCurrentGoal] = useState(1);
+  const [maxGoal, setMaxGoal] = useState(1);
 
   // Bottom sheet durumu
   const [newDeck, setNewDeck] = useState({
@@ -63,7 +63,7 @@ export default function IndexScreen() {
     }
     try {
       // user id 1 olarak hedef 0 yapıldı
-      await insertDeck( 1, newDeck.name, newDeck.description, 0);
+      await insertDeck(1, newDeck.name, newDeck.description, 0);
       setNewDeck({ name: "", description: "" });
       setShowSheet(false);
       loadDecks(); // yeni desteleri yükle
@@ -104,7 +104,7 @@ export default function IndexScreen() {
       setSelectedDeck(deck);
       setMaxGoal(cardCount);
 
-      setCurrentGoal(deck.goal>0 && deck.goal<=cardCount ? deck.goal : 1);
+      setCurrentGoal(deck.goal > 0 && deck.goal <= cardCount ? deck.goal : 1);
       setIsGoalModalVisible(true);
     } catch (error) {
       console.error("Hedef modal'ı açılırken hata:", error);
@@ -112,7 +112,7 @@ export default function IndexScreen() {
   }
 
   const handleSaveGoal = async () => {
-    if(!selectedDeck) return;
+    if (!selectedDeck) return;
     try {
       await updateDeck(selectedDeck.id, selectedDeck.name, selectedDeck.description, Math.round(currentGoal));
 
@@ -120,7 +120,7 @@ export default function IndexScreen() {
       setSelectedDeck(null);
       loadDecks();
       Alert.alert("Başarılı", `'${selectedDeck.name}' destesi için yeni hedef ${Math.round(currentGoal)} olarak ayarlandı.`)
-    }catch(error) {
+    } catch (error) {
       console.error("Hedef kaydedilirken hata:", error);
     }
   };
@@ -128,10 +128,10 @@ export default function IndexScreen() {
     d.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const renderDeck = ({ item }: { item: Deck }) => (
+  const renderDeck = ({ item, index }: { item: Deck; index: number }) => (
     <View style={styles.deckCard}>
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-         <Text style={styles.deckTitle}>{item.name} {item.goal > 0 && `(Hedef: ${item.goal})`}</Text>
+        <Text style={styles.deckTitle}>{item.name} {item.goal > 0 && `(Hedef: ${item.goal})`}</Text>
         <Menu>
           <MenuTrigger>
             <Ionicons name="ellipsis-vertical" size={20} color="#333" />
@@ -145,6 +145,12 @@ export default function IndexScreen() {
       </View>
 
       <Text style={styles.deckDesc}>{item.description}</Text>
+
+      <View style={styles.deckStats}>
+        <Ionicons name="albums-outline" size={16} color="#666" />
+        <Text style={styles.deckStatsText}>{item.cardCount} Kart</Text>
+      </View>
+
       <View style={styles.deckButtons}>
         <TouchableOpacity style={styles.practiceBtn} onPress={() => router.push(`/practice?deckId=${item.id}`)}>
           <Text style={styles.btnText}>Pratikler</Text>
@@ -163,25 +169,33 @@ export default function IndexScreen() {
         <TouchableOpacity onPress={() => navigation.openDrawer()}>
           <Ionicons name="menu" size={35} color="#333" />
         </TouchableOpacity>
-        <TextInput
-          placeholder="Search..."
-          value={search}
-          onChangeText={setSearch}
-          style={styles.search}
-        />
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+          <TextInput
+            placeholder="Destelerinde Ara..."
+            value={search}
+            onChangeText={setSearch}
+            style={styles.searchInput}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <Ionicons name="close-circle" size={20} color="#ccc" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      <Modal visible={isGoalModalVisible} animationType="slide" transparent>
+      <Modal visible={isGoalModalVisible} animationType="slide" transparent onRequestClose={() => setIsGoalModalVisible(false)}>
         <View style={styles.sheet}>
           <Text style={styles.deckTitle}>Hedef Belirle</Text>
           <Text style={styles.deckDesc}>'{selectedDeck?.name}' destesi için günlük çalışma hedefini seç.</Text>
-          
-          <Text style={{fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginVertical: 20}}>
+
+          <Text style={{ fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginVertical: 20 }}>
             Hedef: {Math.round(currentGoal)} / {maxGoal}
           </Text>
 
           <Slider
-            style={{width: '100%', height: 40}}
+            style={{ width: '100%', height: 40 }}
             minimumValue={1}
             maximumValue={maxGoal}
             step={1}
@@ -207,16 +221,24 @@ export default function IndexScreen() {
         data={filteredDecks}
         keyExtractor={(item) => item.id.toString()} // id'nin string olduğundan emin olma
         renderItem={renderDeck}
-        contentContainerStyle={{ paddingBottom: 80 }}
+        contentContainerStyle={{ paddingBottom: 80, padding: 4 }}
+
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="file-tray-stacked-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyText}>Henüz hiç desten yok.</Text>
+            <Text style={styles.emptySubText}>Başlamak için aşağıdaki butondan yeni bir deste oluştur!</Text>
+          </View>
+        )}
       />
 
       {/* Create Button */}
       <TouchableOpacity style={styles.createBtn} onPress={() => setShowSheet(true)}>
-        <Text style={styles.btnText}>+ Deste Oluştur</Text>
+        <Ionicons name="add" size={32} color="white" />
       </TouchableOpacity>
 
       {/* Add Deck Modal */}
-      <Modal visible={showSheet} animationType="slide" transparent>
+      <Modal visible={showSheet} animationType="slide" transparent onRequestClose={() => setShowSheet(false)}>
         <View style={styles.sheet}>
           <TextInput
             placeholder="İsim"
@@ -253,13 +275,21 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 30,
   },
-  search: {
+  searchContainer: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: "#ddd",
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
     borderRadius: 12,
-    padding: 10,
-    backgroundColor: "#fff",
+    paddingHorizontal: 10,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 44,
+    fontSize: 16,
   },
   deckCard: {
     backgroundColor: "#fff",
@@ -270,6 +300,18 @@ const styles = StyleSheet.create({
   },
   deckTitle: { fontSize: 18, fontWeight: "bold" },
   deckDesc: { fontSize: 14, color: "#666", marginVertical: 6 },
+  deckStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    opacity: 0.8,
+  },
+  deckStatsText: {
+    marginLeft: 6,
+    fontSize: 12,
+    color: '#333',
+    fontWeight: '600',
+  },
   deckButtons: { flexDirection: "row", gap: 20 },
   practiceBtn: {
     backgroundColor: "#2196F3",
@@ -284,13 +326,20 @@ const styles = StyleSheet.create({
   btnText: { color: "#fff", fontWeight: "bold" },
   createBtn: {
     backgroundColor: "#FF6B6B",
-    padding: 14,
-    borderRadius: 12,
+    borderRadius: 30,
     position: "absolute",
-    bottom: 20,
+    bottom: 30,
+    right: 30,
     alignSelf: "center",
-    width: width * 0.9,
+    width: 60,
+    height: 60,
+    justifyContent: "center",
     alignItems: "center",
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   sheet: {
     backgroundColor: "#fff",
@@ -312,5 +361,23 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     alignItems: "center",
+  },
+  emptyContainer: {
+    marginTop: Dimensions.get("window").height * 0.2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#aaa',
+    marginTop: 16,
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#ccc',
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 40,
   },
 });

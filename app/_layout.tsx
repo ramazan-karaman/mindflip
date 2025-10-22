@@ -38,16 +38,26 @@ export default function RootLayout() {
 
   return (
   <MenuProvider>
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
-        <Stack.Screen 
-            name="addcard" options={{ presentation: 'modal', title: 'Yeni Kart Ekle' }} />
-        <Stack.Screen name="editDeck" options={{ presentation: 'modal', title: 'Desteyi Düzenle' }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
-  </MenuProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack screenOptions={{
+            headerStyle: {
+                backgroundColor: colorScheme === 'dark' ? '#1c1c1e' : '#ffffff',
+            },
+            headerTintColor: colorScheme === 'dark' ? '#ffffff' : '#000000',
+            headerTitleStyle: {
+                fontWeight: 'bold',
+            },
+            headerBackTitle: "",
+        }}>
+          <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
+          <Stack.Screen name="addcard" options={{ presentation: 'modal', title: 'Yeni Kart Ekle' }} />
+          <Stack.Screen name="editDeck" options={{ presentation: 'modal', title: 'Desteyi Düzenle' }} />
+          <Stack.Screen name="practice" options={{ title: 'Pratik Seçenekleri' }} />
+          <Stack.Screen name="pratik/classic" options={{ title: 'Klasik Pratik' }} />
+        </Stack>
+        
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      </ThemeProvider>
+    </MenuProvider>
   );
 }

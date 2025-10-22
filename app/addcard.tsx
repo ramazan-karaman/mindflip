@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
     Image,
+    Keyboard,
     ScrollView,
     StyleSheet,
     Text,
@@ -24,6 +25,7 @@ export default function AddCardScreen() {
     const [frontImage, setFrontImage] = useState<string | null>(null);
     const [backImage, setBackImage] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const backWordInputRef = useRef<TextInput>(null);
 
     const pickImage = async (setImage: (uri: string | null) => void) => {
         Alert.alert(
@@ -115,8 +117,6 @@ export default function AddCardScreen() {
 
     return (
         <ScrollView style={styles.container}>
-            <Text style={styles.title}>Yeni Kart Ekle</Text>
-
             <View style={styles.inputContainer}>
                 <Text style={styles.label}>Ön Yüz</Text>
                 <View style={styles.textInputWrapper}>
@@ -125,6 +125,9 @@ export default function AddCardScreen() {
                         placeholder="Ön kelime veya cümle"
                         value={frontWord}
                         onChangeText={setFrontWord}
+                        autoFocus={true}
+                        returnKeyType="next"
+                        onSubmitEditing={() => backWordInputRef.current?.focus()}
                     />
                     <TouchableOpacity onPress={() => pickImage(setFrontImage)}>
                         <Ionicons name="image-outline" size={30} color="#4F8EF7" />
@@ -148,10 +151,13 @@ export default function AddCardScreen() {
                 <Text style={styles.label}>Arka Yüz</Text>
                 <View style={styles.textInputWrapper}>
                     <TextInput
+                        ref={backWordInputRef}
                         style={styles.input}
                         placeholder="Arka kelime veya cümle"
                         value={backWord}
                         onChangeText={setBackWord}
+                        returnKeyType="done"
+                        onSubmitEditing={() => Keyboard.dismiss()}
                     />
                     <TouchableOpacity onPress={() => pickImage(setBackImage)}>
                         <Ionicons name="image-outline" size={30} color="#4F8EF7" />
@@ -159,8 +165,8 @@ export default function AddCardScreen() {
                 </View>
                 <View style={styles.imagePreviewContainer}>
                     <Image
-                    source={backImage ? { uri: backImage } : require('../assets/images/mindfliplogo.png')}
-                    style={styles.previewImage}/>
+                        source={backImage ? { uri: backImage } : require('../assets/images/mindfliplogo.png')}
+                        style={styles.previewImage} />
                     {backImage && (
                         <TouchableOpacity
                             style={styles.removeImageButton} onPress={() => setBackImage(null)}>
@@ -168,7 +174,7 @@ export default function AddCardScreen() {
                         </TouchableOpacity>
                     )}
                 </View>
-                
+
             </View>
 
             <TouchableOpacity style={[styles.saveButton, loading && styles.saveButtonDisabled]}
@@ -190,14 +196,6 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f7f7f7',
         padding: 20,
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#333',
-        textAlign: 'center',
-        marginBottom: 30,
-        marginTop: 20,
     },
     inputContainer: {
         marginBottom: 25,

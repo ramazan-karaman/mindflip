@@ -13,6 +13,7 @@ export type PracticeRoute =
     description: string;
     goal: number;
     created_at: string;
+    cardCount?: number;
 }
 
 export interface Card {

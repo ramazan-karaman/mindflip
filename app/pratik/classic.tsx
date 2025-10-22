@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -119,6 +120,7 @@ export default function ClassicScreen() {
 
     const flipCard = () => {
         if (practiceQueue.length === 0) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         rotate.value = withTiming(rotate.value === 0 ? 180 : 0, { duration: 400 });
         setIsFlipped(!isFlipped);
     };
@@ -134,6 +136,12 @@ export default function ClassicScreen() {
     const handleReview = async (quality: number) => {
         const currentCard = practiceQueue[currentIndex];
         if (!currentCard) return;
+
+        if (quality >= 3) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
 
         const { interval, easeFactor, nextReview } = calculateSRS(currentCard, quality);
         await updateCardSRS(currentCard.id, interval, easeFactor, nextReview);

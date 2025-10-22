@@ -1,17 +1,15 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  Dimensions,
   StyleSheet,
   Text,
-  TextInput,
   View
 } from "react-native";
+import { Menu, MenuOption, MenuOptions, MenuTrigger } from "react-native-popup-menu";
 import PracticeModeCard from "../components/practiceModeCard";
-import { getDeckById } from "../lib/services/deckService";
-import { PracticeRoute } from "../types/entities";
-
-const { width, height } = Dimensions.get("window");
+import { getDecks } from "../lib/services/deckService";
+import { Deck, PracticeRoute } from "../types/entities";
 
 
 const practiceModes = [
@@ -25,43 +23,64 @@ const practiceModes = [
 
 export default function PracticeScreen() {
   const router = useRouter();
-  const { deckId } = useLocalSearchParams<{ deckId: string }>();
-  const [search, setSearch] = useState("");
+  const { deckId: initialDeckId } = useLocalSearchParams<{ deckId: string }>();
   const [deckName, setDeckName] = useState("Deste Yükleniyor...");
+  const [allDecks, setAllDecks] = useState<Deck[]>([]);
+  const [activeDeckId, setActiveDeckId] = useState<number | null>(null);
 
   useEffect(() => {
-    const loadDeckInfo = async () => {
-      if (deckId) {
-        try {
-          const deck = await getDeckById(parseInt(deckId));
-          if (deck) {
-            setDeckName(deck.name);
+    if (initialDeckId) {
+      setActiveDeckId(parseInt(initialDeckId));
+    }
+  }, [initialDeckId]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const decks = await getDecks();
+        setAllDecks(decks);
+
+        if (activeDeckId) {
+          const currentDeck = decks.find(d => d.id === activeDeckId);
+          if (currentDeck) {
+            setDeckName(currentDeck.name);
           } else {
             setDeckName("Bilinmeyen Deste");
           }
-        } catch (error) {
-          console.error("Deste bilgisi alınırken hata:", error);
-          setDeckName("Hata");
+        }
+      } catch (error) {
+        console.error("Deste bilgileri alınırken hata:", error);
+        setDeckName("Hata");
       }
-    }
-  };
-  loadDeckInfo();
-  }, [deckId]);
+    };
+    loadData();
+  }, [activeDeckId]);
 
   const handlePress = (route: PracticeRoute) => {
-    router.push(`${route}?deckId=${deckId}`);
+    router.push(`${route}?deckId=${activeDeckId}`);
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.deckName}>{deckName}</Text>
-        <TextInput
-          placeholder="Search..."
-          style={styles.search}
-          value={search}
-          onChangeText={setSearch}
-        />
+        <Menu>
+          <MenuTrigger>
+            <View style={styles.deckNameContainer}>
+              <Text style={styles.deckName}>{deckName}</Text>
+              <Ionicons name="chevron-down" size={24} color="#333" />
+            </View>
+          </MenuTrigger>
+          <MenuOptions customStyles={{ optionsContainer: styles.menuOptions }}>
+            {allDecks.map(deck => (
+              <MenuOption
+                key={deck.id}
+                onSelect={() => setActiveDeckId(deck.id)}
+              >
+                <Text style={styles.menuOptionText}>{deck.name}</Text>
+              </MenuOption>
+            ))}
+          </MenuOptions>
+        </Menu>
       </View>
 
       <View style={styles.grid}>
@@ -83,19 +102,30 @@ export default function PracticeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff", padding: 16 },
   header: {
-    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 60,
-    justifyContent: "space-between",
+    marginBottom: 40,
+    marginTop: 20,
   },
-  deckName: { fontSize: 20, fontWeight: "bold" },
-  search: {
-    borderWidth: 1,
-    borderColor: "#ddd",
+  deckNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#f0f0f0',
     borderRadius: 10,
+  },
+  deckName: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginRight: 8,
+  },
+  menuOptions: {
+    marginTop: 60,
+    borderRadius: 10,
+    padding: 5,
+  },
+  menuOptionText: {
+    fontSize: 16,
     padding: 8,
-    width: width * 0.7,
-    backgroundColor: "#fff",
   },
   grid: {
     flexDirection: "row",

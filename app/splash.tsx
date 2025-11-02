@@ -1,10 +1,11 @@
 import React, { useEffect } from "react";
-import { Dimensions, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
-const { width, height } = Dimensions.get("window"); // ekranın genişliğini öğrenme
-
 export default function Splash() {
+
+    const { width, height } = useWindowDimensions();
+
     const flipAnim = useSharedValue(0); // animasyon kontrol
 
     useEffect(() => {
@@ -25,13 +26,12 @@ export default function Splash() {
 
     return (
         <View style={styles.container}>
-            <Animated.View style={[styles.card, styles.frontCard, frontAnimatedStyle]}>
+            <Animated.View style={[styles.card, styles.frontCard,{ width: width * 0.7, height: height * 0.4 }, frontAnimatedStyle]}>
                 <Text style={styles.text}>MIND</Text>
             </Animated.View>
-            <Animated.View style={[styles.card, styles.backCard, backAnimatedStyle]}>
+            <Animated.View style={[styles.card, styles.backCard,{ width: width * 0.7, height: height * 0.4 }, backAnimatedStyle]}>
                 <Text style={styles.text}>FLIP</Text>
             </Animated.View>
-                <Text style={styles.text}>FLIP</Text>
         </View>
     );
 }
@@ -44,8 +44,6 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     card: {
-        width: width * 0.7,
-        height: height * 0.4,
         backgroundColor: "#2196F3",
         alignItems: "center",
         justifyContent: "center",

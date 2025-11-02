@@ -1,10 +1,16 @@
-import { Ionicons } from "@expo/vector-icons";
-import Slider from "@react-native-community/slider";
-import { DrawerNavigationProp } from "@react-navigation/drawer";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { router } from "expo-router";
-import { useCallback, useState } from "react";
+import { Ionicons } from '@expo/vector-icons';
+import Slider from '@react-native-community/slider';
+import { DrawerNavigationProp } from '@react-navigation/drawer';
+import { useNavigation } from '@react-navigation/native';
 import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { router } from 'expo-router';
+import React, { useState } from 'react';
+import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   FlatList,
@@ -14,132 +20,183 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from "react-native";
-import { Menu, MenuOption, MenuOptions, MenuTrigger } from "react-native-popup-menu";
-import { getCardCountForDeck } from "../../lib/services/cardService";
-import { deleteDeck, getDecks, insertDeck, updateDeck } from "../../lib/services/deckService";
-import { Deck } from "../../types/entities";
-import { RootDrawerParamList } from "./_layout";
+} from 'react-native';
+import {
+  Menu,
+  MenuOption,
+  MenuOptions,
+  MenuTrigger,
+} from 'react-native-popup-menu';
+import * as DeckRepository from '../../lib/repositories/deckRepository';
+import { checkHasPendingChanges } from '../../lib/services/syncService';
+import { DeckWithCardCount } from '../../lib/types';
+import { RootDrawerParamList } from './_layout';
 
-const { width } = Dimensions.get("window");
-
-
-
+const { width } = Dimensions.get('window');
 
 export default function IndexScreen() {
   const navigation = useNavigation<DrawerNavigationProp<RootDrawerParamList>>();
-  const [decks, setDecks] = useState<Deck[]>([]);
-  const [search, setSearch] = useState("");
+  const queryClient = useQueryClient();
+
+  const [search, setSearch] = useState('');
   const [showSheet, setShowSheet] = useState(false);
   const [isGoalModalVisible, setIsGoalModalVisible] = useState(false);
-  const [selectedDeck, setSelectedDeck] = useState<Deck | null>(null);
+  const [selectedDeck, setSelectedDeck] =
+    useState<DeckWithCardCount | null>(null);
   const [currentGoal, setCurrentGoal] = useState(1);
   const [maxGoal, setMaxGoal] = useState(1);
 
-  // Bottom sheet durumu
   const [newDeck, setNewDeck] = useState({
-    name: "",
-    description: "",
+    name: '',
+    description: '',
   });
 
-  const loadDecks = useCallback(async () => {
-    try {
-      const fetchedDecks = await getDecks();
-      setDecks(fetchedDecks);
-    } catch (error) {
-      console.error("Deste yüklenirken hata oluştu:", error);
-    }
-  }, []);
+  const {
+    data: decks,
+    isLoading: isLoadingDecks,
+    isError: isErrorDecks,
+  } = useQuery({
+    queryKey: ['decks'],
+    queryFn: DeckRepository.getDecks,
+  });
 
-  useFocusEffect(() => {
-    loadDecks();
-  }
-  );
+  const { mutate: addDeckMutate, isPending: isAddingDeck } = useMutation({
+    mutationFn: (deckData: { name: string; description: string }) => {
+      return DeckRepository.createDeck(
+        1, 
+        deckData.name,
+        deckData.description,
+        0 
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['decks'] });
+      checkHasPendingChanges();
+      setNewDeck({ name: '', description: '' });
+      setShowSheet(false);
+    },
+    onError: (error) => {
+      console.error('Deste eklenirken hata oluştu:', error);
+      Alert.alert('Hata', 'Deste eklenemedi.');
+    },
+  });
 
-  const addDeck = async () => {
-    if (newDeck.name.trim() === "") {
-      Alert.alert("Hata", "Deste ismi boş olamaz.");
+  const { mutate: deleteDeckMutate } = useMutation({
+    mutationFn: (id: number) => DeckRepository.deleteDeck(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['decks'] });
+      checkHasPendingChanges();
+    },
+    onError: (error) => {
+      console.error('Deste silinirken hata oluştu:', error);
+      Alert.alert('Hata', 'Deste silinemedi.');
+    },
+  });
+
+  const { mutate: updateGoalMutate, isPending: isUpdatingGoal } = useMutation({
+    mutationFn: (variables: { deck: DeckWithCardCount; goal: number }) => {
+      const { deck, goal } = variables;
+      return DeckRepository.updateDeck(
+        deck.id,
+        deck.name,
+        deck.description,
+        goal
+      );
+    },
+    onSuccess: (result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['decks'] });
+      checkHasPendingChanges();
+      setIsGoalModalVisible(false);
+      setSelectedDeck(null);
+      Alert.alert(
+        'Başarılı',
+        `'${variables.deck.name}' destesi için yeni hedef ${variables.goal} olarak ayarlandı.`
+      );
+    },
+    onError: (error) => {
+      console.error('Hedef kaydedilirken hata:', error);
+    },
+  });
+
+  const addDeck = () => {
+    if (newDeck.name.trim() === '') {
+      Alert.alert('Hata', 'Deste ismi boş olamaz.');
       return;
     }
-    try {
-      // user id 1 olarak hedef 0 yapıldı
-      await insertDeck(1, newDeck.name, newDeck.description, 0);
-      setNewDeck({ name: "", description: "" });
-      setShowSheet(false);
-      loadDecks(); // yeni desteleri yükle
-    } catch (error) {
-      console.error("Deste eklenirken hata oluştu:", error);
-    }
+    addDeckMutate(newDeck);
   };
 
   const handleDeleteDeck = (id: number, name: string) => {
     Alert.alert(
-      "Deste Silme",
+      'Deste Silme',
       `${name} destesi silinsin mi?`,
       [
-        { text: "İptal", style: "cancel" },
+        { text: 'İptal', style: 'cancel' },
         {
-          text: "Sil",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteDeck(id);
-              loadDecks(); // desteleri yeniden yükle
-            } catch (error) {
-              console.error("Deste silinirken hata oluştu:", error);
-            }
-          },
+          text: 'Sil',
+          style: 'destructive',
+          onPress: () => deleteDeckMutate(id),
         },
       ]
     );
   };
 
-  const handleOpenGoalSheet = async (deck: Deck) => {
-    try {
-      const cardCount = await getCardCountForDeck(deck.id);
-      if (cardCount < 5) {
-        Alert.alert("Yetersiz kart", "Hedef belirlemek için en az 5 kart eklenmelidir.");
-        return;
-      }
-      setSelectedDeck(deck);
-      setMaxGoal(cardCount);
-
-      setCurrentGoal(deck.goal > 0 && deck.goal <= cardCount ? deck.goal : 1);
-      setIsGoalModalVisible(true);
-    } catch (error) {
-      console.error("Hedef modal'ı açılırken hata:", error);
+  const handleOpenGoalSheet = (deck: DeckWithCardCount) => {
+    if (deck.cardCount < 5) {
+      Alert.alert(
+        'Yetersiz kart',
+        'Hedef belirlemek için en az 5 kart eklenmelidir.'
+      );
+      return;
     }
-  }
+    setSelectedDeck(deck);
+    setMaxGoal(deck.cardCount);
 
-  const handleSaveGoal = async () => {
-    if (!selectedDeck) return;
-    try {
-      await updateDeck(selectedDeck.id, selectedDeck.name, selectedDeck.description, Math.round(currentGoal));
+    const currentGoalValue = deck.goal ?? 0; 
+    setCurrentGoal(
+      currentGoalValue > 0 && currentGoalValue <= deck.cardCount
+        ? currentGoalValue
+        : 1
+    );
 
-      setIsGoalModalVisible(false);
-      setSelectedDeck(null);
-      loadDecks();
-      Alert.alert("Başarılı", `'${selectedDeck.name}' destesi için yeni hedef ${Math.round(currentGoal)} olarak ayarlandı.`)
-    } catch (error) {
-      console.error("Hedef kaydedilirken hata:", error);
-    }
+    setIsGoalModalVisible(true);
   };
-  const filteredDecks = decks.filter((d) =>
-    d.name.toLowerCase().includes(search.toLowerCase())
-  );
 
-  const renderDeck = ({ item, index }: { item: Deck; index: number }) => (
+  const handleSaveGoal = () => {
+    if (!selectedDeck) return;
+    const goal = Math.round(currentGoal);
+    updateGoalMutate({ deck: selectedDeck, goal: goal });
+  };
+
+  const filteredDecks =
+    decks?.filter((d) =>
+      d.name.toLowerCase().includes(search.toLowerCase())
+    ) ?? [];
+
+    const renderDeck = ({ item }: { item: DeckWithCardCount }) => (
     <View style={styles.deckCard}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <Text style={styles.deckTitle}>{item.name} {item.goal > 0 && `(Hedef: ${item.goal})`}</Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <Text style={styles.deckTitle}>
+          {item.name}{' '}
+          {(item.goal ?? 0) > 0 && `(Hedef: ${item.goal})`}
+        </Text>
         <Menu>
           <MenuTrigger>
             <Ionicons name="ellipsis-vertical" size={20} color="#333" />
           </MenuTrigger>
           <MenuOptions>
-            <MenuOption onSelect={() => router.push(`/editDeck?deckId=${item.id}`)} text="Düzenle" />
-            <MenuOption onSelect={() => handleDeleteDeck(item.id, item.name)} text="Sil" />
-            <MenuOption onSelect={() => handleOpenGoalSheet(item)} text="Hedef" />
+            <MenuOption
+              onSelect={() => router.push(`/editDeck?deckId=${item.id}`)}
+              text="Düzenle"
+            />
+            <MenuOption
+              onSelect={() => handleDeleteDeck(item.id, item.name)}
+              text="Sil"
+            />
+            <MenuOption
+              onSelect={() => handleOpenGoalSheet(item)}
+              text="Hedef"
+            />
           </MenuOptions>
         </Menu>
       </View>
@@ -152,10 +209,16 @@ export default function IndexScreen() {
       </View>
 
       <View style={styles.deckButtons}>
-        <TouchableOpacity style={styles.practiceBtn} onPress={() => router.push(`/practice?deckId=${item.id}`)}>
+        <TouchableOpacity
+          style={styles.practiceBtn}
+          onPress={() => router.push(`/practice?deckId=${item.id}`)}
+        >
           <Text style={styles.btnText}>Pratikler</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.addCardBtn} onPress={() => router.push(`/addcard?deckId=${item.id}`)}>
+        <TouchableOpacity
+          style={styles.addCardBtn}
+          onPress={() => router.push(`/addcard?deckId=${item.id}`)}
+        >
           <Text style={styles.btnText}>+ Kart Ekle</Text>
         </TouchableOpacity>
       </View>
@@ -164,13 +227,17 @@ export default function IndexScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Search Row */}
       <View style={styles.searchRow}>
         <TouchableOpacity onPress={() => navigation.openDrawer()}>
           <Ionicons name="menu" size={35} color="#333" />
         </TouchableOpacity>
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+          <Ionicons
+            name="search"
+            size={20}
+            color="#999"
+            style={styles.searchIcon}
+          />
           <TextInput
             placeholder="Destelerinde Ara..."
             value={search}
@@ -185,12 +252,26 @@ export default function IndexScreen() {
         </View>
       </View>
 
-      <Modal visible={isGoalModalVisible} animationType="slide" transparent onRequestClose={() => setIsGoalModalVisible(false)}>
+      <Modal
+        visible={isGoalModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsGoalModalVisible(false)}
+      >
         <View style={styles.sheet}>
           <Text style={styles.deckTitle}>Hedef Belirle</Text>
-          <Text style={styles.deckDesc}>'{selectedDeck?.name}' destesi için günlük çalışma hedefini seç.</Text>
+          <Text style={styles.deckDesc}>
+            '{selectedDeck?.name}' destesi için günlük çalışma hedefini seç.
+          </Text>
 
-          <Text style={{ fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginVertical: 20 }}>
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: 'bold',
+              textAlign: 'center',
+              marginVertical: 20,
+            }}
+          >
             Hedef: {Math.round(currentGoal)} / {maxGoal}
           </Text>
 
@@ -205,40 +286,70 @@ export default function IndexScreen() {
             maximumTrackTintColor="#000000"
           />
 
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSaveGoal}>
-            <Text style={styles.btnText}>Kaydet</Text>
+          <TouchableOpacity
+            style={[styles.saveBtn, isUpdatingGoal && styles.saveBtnDisabled]}
+            onPress={handleSaveGoal}
+            disabled={isUpdatingGoal}
+          >
+            {isUpdatingGoal ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.btnText}>Kaydet</Text>
+            )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setIsGoalModalVisible(false)}>
-            <Text style={{ textAlign: "center", marginTop: 10, color: "red" }}>
+            <Text style={{ textAlign: 'center', marginTop: 10, color: 'red' }}>
               İptal
             </Text>
           </TouchableOpacity>
         </View>
       </Modal>
 
-      {/* Deck List */}
       <FlatList
         data={filteredDecks}
-        keyExtractor={(item) => item.id.toString()} // id'nin string olduğundan emin olma
+        keyExtractor={(item) => item.id.toString()}
         renderItem={renderDeck}
         contentContainerStyle={{ paddingBottom: 80, padding: 4 }}
-
-        ListEmptyComponent={() => (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="file-tray-stacked-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>Henüz hiç desten yok.</Text>
-            <Text style={styles.emptySubText}>Başlamak için aşağıdaki butondan yeni bir deste oluştur!</Text>
-          </View>
-        )}
+        ListEmptyComponent={() =>
+          isLoadingDecks ? (
+            <View style={styles.emptyContainer}>
+              <ActivityIndicator size="large" color="#ccc" />
+              <Text style={styles.emptyText}>Desteler yükleniyor...</Text>
+            </View>
+          ) : isErrorDecks ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="alert-circle-outline" size={64} color="red" />
+              <Text style={styles.emptyText}>Desteler yüklenemedi.</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons
+                name="file-tray-stacked-outline"
+                size={64}
+                color="#ccc"
+              />
+              <Text style={styles.emptyText}>Henüz hiç desten yok.</Text>
+              <Text style={styles.emptySubText}>
+                Başlamak için aşağıdaki butondan yeni bir deste oluştur!
+              </Text>
+            </View>
+          )
+        }
       />
 
-      {/* Create Button */}
-      <TouchableOpacity style={styles.createBtn} onPress={() => setShowSheet(true)}>
+      <TouchableOpacity
+        style={styles.createBtn}
+        onPress={() => setShowSheet(true)}
+      >
         <Ionicons name="add" size={32} color="white" />
       </TouchableOpacity>
 
-      {/* Add Deck Modal */}
-      <Modal visible={showSheet} animationType="slide" transparent onRequestClose={() => setShowSheet(false)}>
+      <Modal
+        visible={showSheet}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowSheet(false)}
+      >
         <View style={styles.sheet}>
           <TextInput
             placeholder="İsim"
@@ -252,12 +363,20 @@ export default function IndexScreen() {
             onChangeText={(t) => setNewDeck({ ...newDeck, description: t })}
             style={styles.input}
           />
-          <TouchableOpacity style={styles.saveBtn} onPress={addDeck}>
-            <Text style={styles.btnText}>Save</Text>
+          <TouchableOpacity
+            style={[styles.saveBtn, isAddingDeck && styles.saveBtnDisabled]}
+            onPress={addDeck}
+            disabled={isAddingDeck}
+          >
+            {isAddingDeck ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.btnText}>Kaydet</Text>
+            )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setShowSheet(false)}>
-            <Text style={{ textAlign: "center", marginTop: 10, color: "red" }}>
-              Cancel
+            <Text style={{ textAlign: 'center', marginTop: 10, color: 'red' }}>
+              İptal
             </Text>
           </TouchableOpacity>
         </View>
@@ -267,10 +386,10 @@ export default function IndexScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f7f7f7", padding: 16 },
+  container: { flex: 1, backgroundColor: '#f7f7f7', padding: 16 },
   searchRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
     gap: 10,
     marginTop: 30,
@@ -292,14 +411,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   deckCard: {
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
     elevation: 2,
   },
-  deckTitle: { fontSize: 18, fontWeight: "bold" },
-  deckDesc: { fontSize: 14, color: "#666", marginVertical: 6 },
+  deckTitle: { fontSize: 18, fontWeight: 'bold' },
+  deckDesc: { fontSize: 14, color: '#666', marginVertical: 6 },
   deckStats: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -312,29 +431,33 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '600',
   },
-  deckButtons: { flexDirection: "row", gap: 20 },
+  deckButtons: { flexDirection: 'row', gap: 20, marginTop: 15 },
   practiceBtn: {
-    backgroundColor: "#2196F3",
+    backgroundColor: '#2196F3',
     padding: 10,
     borderRadius: 8,
+    flex: 1,
+    alignItems: 'center',
   },
   addCardBtn: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: '#4CAF50',
     padding: 10,
     borderRadius: 8,
+    flex: 1,
+    alignItems: 'center',
   },
-  btnText: { color: "#fff", fontWeight: "bold" },
+  btnText: { color: '#fff', fontWeight: 'bold' },
   createBtn: {
-    backgroundColor: "#FF6B6B",
+    backgroundColor: '#FF6B6B',
     borderRadius: 30,
-    position: "absolute",
+    position: 'absolute',
     bottom: 30,
     right: 30,
-    alignSelf: "center",
+    alignSelf: 'center',
     width: 60,
     height: 60,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -342,8 +465,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   sheet: {
-    backgroundColor: "#fff",
-    marginTop: "auto",
+    backgroundColor: '#fff',
+    marginTop: 'auto',
     padding: 20,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -351,19 +474,24 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: '#ddd',
     borderRadius: 8,
     padding: 10,
     marginBottom: 12,
   },
   saveBtn: {
-    backgroundColor: "#2196F3",
+    backgroundColor: '#2196F3',
     padding: 12,
     borderRadius: 10,
-    alignItems: "center",
+    alignItems: 'center',
+    height: 48,
+    justifyContent: 'center',
+  },
+  saveBtnDisabled: {
+    backgroundColor: '#90CAF9',
   },
   emptyContainer: {
-    marginTop: Dimensions.get("window").height * 0.2,
+    marginTop: Dimensions.get('window').height * 0.2,
     alignItems: 'center',
     justifyContent: 'center',
   },

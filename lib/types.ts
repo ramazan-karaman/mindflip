@@ -1,3 +1,4 @@
+import { SQLiteRunResult } from "expo-sqlite";
 
 export type SyncStatus = 'pending_create' | 'pending_update' | 'pending_delete' | 'synced';
 
@@ -57,6 +58,14 @@ export interface User extends BaseRecord {
   email: string | null;
   password: string | null; // authentication yapılırken token yapılacak
   profile_photo: string | null;
+}
+
+export interface IRepository<T> {
+  create(data: Omit<T, keyof BaseRecord>): Promise<T | null>;
+  getById(id: number): Promise<T | null>;
+  getAll(): Promise<T[]>;
+  update(id: number, data: Partial<Omit<T, keyof BaseRecord>>): Promise<SQLiteRunResult>;
+  delete(id: number): Promise<SQLiteRunResult>;
 }
 
 export type PracticeRoute = 

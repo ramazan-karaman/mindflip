@@ -1,118 +1,147 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useLocalSearchParams } from "expo-router";
-import { useRef, useState } from "react";
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Keyboard,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { insertCard } from "../lib/services/cardService";
+    ActivityIndicator,
+    Alert,
+    Image,
+    Keyboard,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import * as CardRepository from '../lib/repositories/cardRepository';
+import { checkHasPendingChanges } from '../lib/services/syncService';
+
 
 export default function AddCardScreen() {
-
     const { deckId } = useLocalSearchParams();
+    const router = useRouter();
+    const queryClient = useQueryClient();
 
-    const [frontWord, setFrontWord] = useState("");
-    const [backWord, setBackWord] = useState("");
+    const [frontWord, setFrontWord] = useState('');
+    const [backWord, setBackWord] = useState('');
     const [frontImage, setFrontImage] = useState<string | null>(null);
     const [backImage, setBackImage] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
     const backWordInputRef = useRef<TextInput>(null);
 
     const pickImage = async (setImage: (uri: string | null) => void) => {
         Alert.alert(
-            "Resim Seç",
-            "Nereden bir resim eklemek istersin?",
+            'Resim Seç',
+            'Nereden bir resim eklemek istersin?',
             [
                 {
-                    text: "Galeriden Seç",
+                    text: 'Galeriden Seç',
                     onPress: async () => {
-                        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                        const permissionResult =
+                            await ImagePicker.requestMediaLibraryPermissionsAsync();
                         if (permissionResult.granted === false) {
-                            Alert.alert("İzin Gerekli", "Resim seçebilmek için galeri izni vermeniz gerekiyor.");
+                            Alert.alert(
+                                'İzin Gerekli',
+                                'Resim seçebilmek için galeri izni vermeniz gerekiyor.'
+                            );
                             return;
                         }
-
                         const result = await ImagePicker.launchImageLibraryAsync({
                             mediaTypes: ImagePicker.MediaTypeOptions.Images,
                             allowsEditing: true,
                             aspect: [4, 3],
                             quality: 1,
                         });
-
                         if (!result.canceled) {
                             setImage(result.assets[0].uri);
                         }
                     },
                 },
                 {
-                    text: "Fotoğraf Çek",
+                    text: 'Fotoğraf Çek',
                     onPress: async () => {
-                        const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+                        const permissionResult =
+                            await ImagePicker.requestCameraPermissionsAsync();
                         if (permissionResult.granted === false) {
-                            Alert.alert("İzin Gerekli", "Fotoğraf çekebilmek için kamera izni vermeniz gerekiyor.");
+                            Alert.alert(
+                                'İzin Gerekli',
+                                'Fotoğraf çekebilmek için kamera izni vermeniz gerekiyor.'
+                            );
                             return;
                         }
-
                         const result = await ImagePicker.launchCameraAsync({
                             allowsEditing: true,
                             aspect: [4, 3],
                             quality: 1,
                         });
-
                         if (!result.canceled) {
                             setImage(result.assets[0].uri);
                         }
                     },
                 },
                 {
-                    text: "İptal",
-                    style: "cancel",
+                    text: 'İptal',
+                    style: 'cancel',
                 },
             ]
         );
     };
 
-    const handleSaveCard = async () => {
-        if (frontWord.trim() === '' || backWord.trim() === '') {
-            Alert.alert("Hata", "Ön ve Arka kelime alanları boş bırakılamaz.");
-            return;
-        }
-        if (!deckId) {
-            Alert.alert("Hata", "Deste ID'si bulunamadı. Lütfen ana sayfaya geri dönüp tekrar deneyin.");
-            return;
-        }
-        setLoading(true);
-        try {
-            await insertCard(
-                parseInt(deckId as string, 10), // deckId'yi sayıya çevirme
-                frontWord,
-                frontImage,
-                backWord,
-                backImage
+    const { mutate: addCard, isPending } = useMutation({
+        mutationFn: (newCard: {
+            deck_id: number;
+            front_word: string;
+            front_image: string | null;
+            back_word: string;
+            back_image: string | null;
+        }) => {
+            return CardRepository.createCard(
+                newCard.deck_id,
+                newCard.front_word,
+                newCard.front_image,
+                newCard.back_word,
+                newCard.back_image,
+                null
             );
+        },
 
-            Alert.alert("Başarılı", "Kart desteye eklendi!");
+        onSuccess: (newlyCreatedCard) => {
+            console.log('Kart başarıyla eklendi (local):', newlyCreatedCard?.id);
 
-            setFrontWord('');
-            setBackWord('');
-            setFrontImage(null);
-            setBackImage(null);
+            queryClient.invalidateQueries({ queryKey: ['cards', deckId] });
+            queryClient.invalidateQueries({ queryKey: ['decks'] });
 
-        } catch (error) {
-            console.error("Kart kaydedilirken hata:", error);
-            Alert.alert("Hata", "Kart kaydedilirken bir sorun oluştu.");
-        } finally {
-            setLoading(false);
+            checkHasPendingChanges();
+
+            router.back();
+        },
+        onError: (error) => {
+            console.error('Kart kaydedilirken hata:', error);
+            Alert.alert('Hata', 'Kart kaydedilirken bir sorun oluştu.');
+        },
+    });
+    const handleSaveCard = () => {
+        if (frontWord.trim() === '' || backWord.trim() === '') {
+            Alert.alert('Hata', 'Ön ve Arka kelime alanları boş bırakılamaz.');
+            return;
         }
+        if (!deckId || typeof deckId !== 'string') {
+            Alert.alert(
+                'Hata',
+                'Deste ID\'si bulunamadı. Lütfen ana sayfaya geri dönüp tekrar deneyin.'
+            );
+            return;
+        }
+
+        addCard({
+            deck_id: parseInt(deckId, 10),
+            front_word: frontWord,
+            front_image: frontImage,
+            back_word: backWord,
+            back_image: backImage,
+        });
     };
 
     return (
@@ -136,11 +165,18 @@ export default function AddCardScreen() {
 
                 <View style={styles.imagePreviewContainer}>
                     <Image
-                        source={frontImage ? { uri: frontImage } : require('../assets/images/mindfliplogo.png')}
-                        style={styles.previewImage} />
+                        source={
+                            frontImage
+                                ? { uri: frontImage }
+                                : require('../assets/images/mindfliplogo.png')
+                        }
+                        style={styles.previewImage}
+                    />
                     {frontImage && (
                         <TouchableOpacity
-                            style={styles.removeImageButton} onPress={() => setFrontImage(null)}>
+                            style={styles.removeImageButton}
+                            onPress={() => setFrontImage(null)}
+                        >
                             <Ionicons name="close-circle" size={30} color="red" />
                         </TouchableOpacity>
                     )}
@@ -165,23 +201,30 @@ export default function AddCardScreen() {
                 </View>
                 <View style={styles.imagePreviewContainer}>
                     <Image
-                        source={backImage ? { uri: backImage } : require('../assets/images/mindfliplogo.png')}
-                        style={styles.previewImage} />
+                        source={
+                            backImage
+                                ? { uri: backImage }
+                                : require('../assets/images/mindfliplogo.png')
+                        }
+                        style={styles.previewImage}
+                    />
                     {backImage && (
                         <TouchableOpacity
-                            style={styles.removeImageButton} onPress={() => setBackImage(null)}>
+                            style={styles.removeImageButton}
+                            onPress={() => setBackImage(null)}
+                        >
                             <Ionicons name="close-circle" size={30} color="red" />
                         </TouchableOpacity>
                     )}
                 </View>
-
             </View>
 
-            <TouchableOpacity style={[styles.saveButton, loading && styles.saveButtonDisabled]}
+            <TouchableOpacity
+                style={[styles.saveButton, isPending && styles.saveButtonDisabled]}
                 onPress={handleSaveCard}
-                disabled={loading}
+                disabled={isPending}
             >
-                {loading ? (
+                {isPending ? (
                     <ActivityIndicator color="white" />
                 ) : (
                     <Text style={styles.saveButtonText}>Kartı Kaydet</Text>

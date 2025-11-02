@@ -51,7 +51,7 @@ export const initializeDatabase = async() => {
         goal INTEGER, 
         created_at TEXT, 
         last_modified TEXT NOT NULL DeFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-        sync_status TEXT NOT NULL DEFAULT 'synced'
+        sync_status TEXT NOT NULL DEFAULT 'synced',
         FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
       );
 

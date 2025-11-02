@@ -1,75 +1,103 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { deleteCard, getCardsByDeckId } from '../lib/services/cardService';
-import { getDeckById, updateDeck } from '../lib/services/deckService';
-import { Card, Deck } from '../types/entities';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import * as CardRepository from '../lib/repositories/cardRepository';
+import * as DeckRepository from '../lib/repositories/deckRepository';
+import { checkHasPendingChanges } from '../lib/services/syncService';
+import { Card } from '../lib/types';
 
 export default function EditDeckScreen() {
     const { deckId } = useLocalSearchParams();
-    const navigation = useNavigation();
+    const router = useRouter();
+    const queryClient = useQueryClient();
 
-    const [deck, setDeck] = useState<Deck | null>(null);
-    const [cards, setCards] = useState<Card[]>([]);
+    const id = deckId && typeof deckId === 'string' ? parseInt(deckId, 10) : NaN;
+
     const [deckName, setDeckName] = useState('');
     const [deckDescription, setDeckDescription] = useState('');
-    const [loading, setLoading] = useState(true);
 
-    const loadData = useCallback(async () => {
-        if (!deckId) return;
-        setLoading(true);
-        try {
-            const id = parseInt(deckId as string);
-            const currentDeck = await getDeckById(id);
-            if (currentDeck) {
-                setDeck(currentDeck);
-                setDeckName(currentDeck.name);
-                setDeckDescription(currentDeck.description);
-            }
-            const fetchedCards = await getCardsByDeckId(parseInt(deckId as string));
-            setCards(fetchedCards);
-        } catch (error) {
-            console.error("Veri yüklenirken hata:", error);
-        }
-        finally {
-            setLoading(false);
-        }
-    }, [deckId]);
+    const { data: deck, isLoading: isLoadingDeck } = useQuery({
+        queryKey: ['deck', id],
+        queryFn: () => DeckRepository.getDeckById(id),
+        enabled: !isNaN(id),
+    });
+
+    const { data: cards, isLoading: isLoadingCards } = useQuery({
+        queryKey: ['cards', id],
+        queryFn: () => CardRepository.getCardByIdDeck(id),
+        enabled: !isNaN(id),
+    });
 
     useEffect(() => {
-        loadData();
-    }, [loadData]);
-
-    const handleUpdateDeck = async () => {
-        if (!deck) return;
-        try {
-            await updateDeck(deck.id, deckName, deckDescription, deck.goal); // goal'u korumak için deck.goal kullanıldı
-            Alert.alert("Başarılı", "Deste bilgileri güncellendi.");
-            navigation.goBack();
-        } catch (error) {
-            console.error("Deste güncellenirken hata:", error);
-            Alert.alert("Hata", "Deste güncellenemedi.");
+        if (deck) {
+            setDeckName(deck.name);
+            setDeckDescription(deck.description ?? '');
         }
+    }, [deck]);
+
+    const { mutate: updateDeckMutate, isPending: isUpdatingDeck } = useMutation({
+        mutationFn: (variables: { name: string; description: string }) => {
+            if (!deck) throw new Error('Deste yüklenemedi.');
+            return DeckRepository.updateDeck(
+                deck.id,
+                variables.name,
+                variables.description,
+                deck.goal
+            );
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['deck', id] });
+            queryClient.invalidateQueries({ queryKey: ['decks'] });
+            checkHasPendingChanges();
+
+            Alert.alert('Başarılı', 'Deste bilgileri güncellendi.');
+            router.back();
+        },
+        onError: (error) => {
+            console.error('Deste güncellenirken hata:', error);
+            Alert.alert('Hata', 'Deste güncellenemedi.');
+        },
+    });
+
+    const { mutate: deleteCardMutate } = useMutation({
+        mutationFn: (cardId: number) => CardRepository.deleteCard(cardId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['cards', id] });
+            queryClient.invalidateQueries({ queryKey: ['decks'] });
+            checkHasPendingChanges();
+        },
+        onError: (error) => {
+            console.error('Kart silinirken hata:', error);
+            Alert.alert('Hata', 'Kart silinemedi.');
+        },
+    });
+
+    const handleUpdateDeck = () => {
+        updateDeckMutate({ name: deckName, description: deckDescription });
     };
 
     const handleDeleteCard = (cardId: number) => {
         Alert.alert(
-            "Kartı Sil",
-            "Bu kartı silmek istediğinizden emin misiniz?",
+            'Kartı Sil',
+            'Bu kartı silmek istediğinizden emin misiniz?',
             [
-                { text: "İptal", style: "cancel" },
+                { text: 'İptal', style: 'cancel' },
                 {
-                    text: "Sil",
-                    style: "destructive",
-                    onPress: async () => {
-                        try {
-                            await deleteCard(cardId);
-                            loadData();
-                        } catch (error) {
-                            console.error("Kart silinirken hata:", error);
-                        }
-                    },
+                    text: 'Sil',
+                    style: 'destructive',
+                    onPress: () => deleteCardMutate(cardId),
                 },
             ]
         );
@@ -82,20 +110,27 @@ export default function EditDeckScreen() {
                 <Text style={styles.cardTextBack}>{item.back_word}</Text>
             </View>
             {(item.front_image || item.back_image) && (
-                <Ionicons name="image" size={20} color="#ccc" style={{ marginRight: 15 }} />
+                <Ionicons
+                    name="image"
+                    size={20}
+                    color="#ccc"
+                    style={{ marginRight: 15 }}
+                />
             )}
             <TouchableOpacity onPress={() => handleDeleteCard(item.id)}>
                 <Ionicons name="trash-bin-outline" size={24} color="#ff4d4d" />
             </TouchableOpacity>
         </View>
     );
-    if (loading) {
+
+    if (isLoadingDeck || isLoadingCards) {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#2196F3" />
             </View>
         );
     }
+
     return (
         <ScrollView style={styles.container}>
             <View style={styles.deckInfoContainer}>
@@ -112,22 +147,36 @@ export default function EditDeckScreen() {
                     onChangeText={setDeckDescription}
                     multiline
                 />
-                <TouchableOpacity style={styles.saveButton} onPress={handleUpdateDeck}>
-                    <Text style={styles.saveButtonText}>Deste Bilgilerini Kaydet</Text>
+                <TouchableOpacity
+                    style={[styles.saveButton, isUpdatingDeck && styles.saveButtonDisabled]}
+                    onPress={handleUpdateDeck}
+                    disabled={isUpdatingDeck}
+                >
+                    {isUpdatingDeck ? (
+                        <ActivityIndicator color="white" />
+                    ) : (
+                        <Text style={styles.saveButtonText}>Deste Bilgilerini Kaydet</Text>
+                    )}
                 </TouchableOpacity>
             </View>
 
-            <Text style={styles.cardsHeader}>Kartlar ({cards.length})</Text>
+            <Text style={styles.cardsHeader}>
+                Kartlar ({cards ? cards.length : 0})
+            </Text>
 
             <FlatList
-                data={cards}
+                data={cards ?? []}
                 renderItem={renderCardItem}
                 keyExtractor={(item) => item.id.toString()}
-                scrollEnabled={false} // ScrollView içinde olduğu için
+                scrollEnabled={false}
                 ListEmptyComponent={() => (
                     <View style={styles.emptyCardsContainer}>
-                        <Text style={styles.emptyCardsText}>Bu destede henüz hiç kart yok.</Text>
-                        <Text style={styles.emptyCardsSubText}>Ana sayfadan '+ Kart Ekle' butonunu kullanabilirsin.</Text>
+                        <Text style={styles.emptyCardsText}>
+                            Bu destede henüz hiç kart yok.
+                        </Text>
+                        <Text style={styles.emptyCardsSubText}>
+                            Ana sayfadan '+ Kart Ekle' butonunu kullanabilirsin.
+                        </Text>
                     </View>
                 )}
             />
@@ -165,6 +214,11 @@ const styles = StyleSheet.create({
         padding: 14,
         borderRadius: 8,
         alignItems: 'center',
+        height: 48,
+        justifyContent: 'center',
+    },
+    saveButtonDisabled: {
+        backgroundColor: '#90CAF9',
     },
     saveButtonText: {
         color: 'white',

@@ -3,16 +3,16 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Keyboard,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Keyboard,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { insertCard } from "../lib/services/cardService";
 

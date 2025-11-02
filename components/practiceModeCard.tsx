@@ -2,8 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Dimensions, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { PracticeRoute } from '../types/entities';
-
+import { PracticeRoute } from '../lib/types';
 const { width, height } = Dimensions.get("window");
 
 
@@ -11,11 +10,12 @@ type PracticeModeCardProps = {
   title: string;
   route: PracticeRoute;
   color: string;
-  icon: any;
+  icon: keyof typeof Ionicons.glyphMap;
   onPress: (route: PracticeRoute) => void;
+  disabled?: boolean;
 };
 
-const PracticeModeCard = ({ title, route, color, icon, onPress }: PracticeModeCardProps) => {
+const PracticeModeCard = ({ title, route, color, icon, onPress, disabled, }: PracticeModeCardProps) => {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -23,6 +23,8 @@ const PracticeModeCard = ({ title, route, color, icon, onPress }: PracticeModeCa
   }));
 
   const onCardPress = () => {
+    if(disabled) return;
+
     scale.value = withTiming(1.05, { duration: 150 }, () => {
       scale.value = withTiming(1, { duration: 150 });
     });
@@ -31,8 +33,8 @@ const PracticeModeCard = ({ title, route, color, icon, onPress }: PracticeModeCa
   };
 
   return (
-    <Animated.View style={[styles.card, { backgroundColor: color }, animatedStyle]}>
-      <TouchableOpacity onPress={onCardPress} style={styles.cardBtn}>
+    <Animated.View style={[styles.card, { backgroundColor: color }, animatedStyle,disabled && styles.disabledCard,]}>
+      <TouchableOpacity onPress={onCardPress} style={styles.cardBtn} disabled={disabled} activeOpacity={0.7}>
         <Ionicons name={icon} size={28} color="#fff" style={{ marginBottom: 8 }} />
         <Text style={styles.cardText}>{title}</Text>
       </TouchableOpacity>
@@ -65,6 +67,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     textAlign: "center",
+  },
+  disabledCard:{
+    opacity: 0.5,
+    elevation: 0,
   },
 });
 

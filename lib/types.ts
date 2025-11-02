@@ -58,3 +58,11 @@ export interface User extends BaseRecord {
   password: string | null; // authentication yapılırken token yapılacak
   profile_photo: string | null;
 }
+
+export type PracticeRoute = 
+  | "/pratik/classic"
+  | "/pratik/match"
+  | "/pratik/truefalse"
+  | "/pratik/order"
+  | "/pratik/multiple"
+  | "/pratik/random";

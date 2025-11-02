@@ -93,7 +93,7 @@ export const updateCardContent = async(
         console.log(`Kart ${id} içeriği güncellendi.`);
         return result;
     }catch(error){
-        console.log(`Kart ${id} içeriği güncellenirken hata:`,error);
+        console.error(`Kart ${id} içeriği güncellenirken hata:`,error);
         throw error;
     }
 };
@@ -120,7 +120,7 @@ export const updateCardSRS = async(
         return result;
 
     }catch(error){
-        console.log(`Kart ${id} SRS bilgileri güncellenirken hata:`,error);
+        console.error(`Kart ${id} SRS bilgileri güncellenirken hata:`,error);
         throw error;
     }
 };
@@ -133,11 +133,11 @@ export const deleteCard = async (id: number): Promise<SQLiteRunResult> =>{
     last_modified= ? WHERE id = ?;`;
     try{
         const result= await db.runAsync(query, [now,id]);
-        console.log(`Kart ${id} silindi.`);
+        console.log(`Kart ${id} silinmek üzere işaretlendi`);
         return result;
 
     }catch(error){
-        console.log(`Kart ${id} silinirken hata:`,error);
+        console.error(`Kart ${id} silinirken hata:`,error);
         throw error;
     }
 }
@@ -151,7 +151,7 @@ export const getCardCountForDeck = async (deck_id: number): Promise<number> =>{
         return result?.count ?? 0;
 
     }catch(error){
-        console.log(`Deste ${deck_id} kart sayısı alınırken hata:`,error);
+        console.error(`Deste ${deck_id} kart sayısı alınırken hata:`,error);
         throw error;
     }
 }

@@ -20,3 +20,15 @@ export interface Card extends BaseRecord {
   easeFactor: number;
   nextReview: string;
 }
+
+export interface Deck extends BaseRecord {
+  user_id: number;
+  name: string;
+  description: string | null;
+  goal: number | null;
+  created_at: string;
+}
+
+export interface DeckWithCardCount extends Deck {
+  cardCount: number;
+}

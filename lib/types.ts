@@ -32,3 +32,29 @@ export interface Deck extends BaseRecord {
 export interface DeckWithCardCount extends Deck {
   cardCount: number;
 }
+
+export interface Practice extends BaseRecord {
+  user_id: number;
+  deck_id: number;
+  date: string; 
+  duration: number; 
+  success_rate: number | null;
+}
+
+export interface Statistic extends BaseRecord {
+  user_id: number;
+  date: string; 
+  studied_card_count: number;
+  added_card_count: number;
+  learned_card_count: number;
+  spent_time: number;
+  practice_success_rate: number | null;
+  deck_success_rate: number | null;
+}
+
+export interface User extends BaseRecord {
+  name: string | null;
+  email: string | null;
+  password: string | null; // authentication yapılırken token yapılacak
+  profile_photo: string | null;
+}

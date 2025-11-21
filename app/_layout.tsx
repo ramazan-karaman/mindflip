@@ -14,6 +14,7 @@ import {
   runFullSync,
 } from '../lib/services/syncService';
 
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Splash from './splash';
 
 export const unstable_settings = {
@@ -53,43 +54,45 @@ export default function RootLayout() {
   }
 
   return (
-    <MenuProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <QueryClientProvider client={queryClient}>
-          <Stack
-            screenOptions={{
-              headerStyle: {
-                backgroundColor: colorScheme === 'dark' ? '#1c1c1e' : '#ffffff',
-              },
-              headerTintColor: colorScheme === 'dark' ? '#ffffff' : '#000000',
-              headerTitleStyle: {
-                fontWeight: 'bold',
-              },
-              headerBackTitle: '',
-            }}
-          >
-            <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="addcard"
-              options={{ presentation: 'modal', title: 'Yeni Kart Ekle' }}
-            />
-            <Stack.Screen
-              name="editDeck"
-              options={{ presentation: 'modal', title: 'Desteyi Düzenle' }}
-            />
-            <Stack.Screen
-              name="practice"
-              options={{ title: 'Pratik Seçenekleri' }}
-            />
-            <Stack.Screen
-              name="pratik/classic"
-              options={{ title: 'Klasik Pratik' }}
-            />
-          </Stack>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <MenuProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <QueryClientProvider client={queryClient}>
+            <Stack
+              screenOptions={{
+                headerStyle: {
+                  backgroundColor: colorScheme === 'dark' ? '#1c1c1e' : '#ffffff',
+                },
+                headerTintColor: colorScheme === 'dark' ? '#ffffff' : '#000000',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+                headerBackTitle: '',
+              }}
+            >
+              <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="addcard"
+                options={{ presentation: 'modal', title: 'Yeni Kart Ekle' }}
+              />
+              <Stack.Screen
+                name="editDeck"
+                options={{ presentation: 'modal', title: 'Desteyi Düzenle' }}
+              />
+              <Stack.Screen
+                name="practice"
+                options={{ title: 'Pratik Seçenekleri' }}
+              />
+              <Stack.Screen
+                name="pratik/classic"
+                options={{ title: 'Klasik Pratik' }}
+              />
+            </Stack>
 
-          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-        </QueryClientProvider>
-      </ThemeProvider>
-    </MenuProvider>
+            <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+          </QueryClientProvider>
+        </ThemeProvider>
+      </MenuProvider>
+    </GestureHandlerRootView>
   );
 }

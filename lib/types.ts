@@ -72,6 +72,6 @@ export type PracticeRoute =
   | "/pratik/classic"
   | "/pratik/match"
   | "/pratik/truefalse"
-  | "/pratik/order"
+  | "/pratik/write"
   | "/pratik/multiple"
   | "/pratik/random";

@@ -18,7 +18,7 @@ const practiceModes = [
   { id: "1", title: "Klasik", route: "/pratik/classic" , color: "#2196F3", icon: "book" },
   { id: "2", title: "Eşleştirme", route: "/pratik/match" , color: "#FF9800", icon: "git-compare" },
   { id: "3", title: "True / False", route: "/pratik/truefalse", color: "#4CAF50", icon: "checkmark-done" },
-  { id: "4", title: "Harf sıralama", route: "/pratik/order", color: "#9C27B0", icon: "text" },
+  { id: "4", title: "Yazma", route: "/pratik/write", color: "#9C27B0", icon: "text" },
   { id: "5", title: "Çoktan seçmeli", route: "/pratik/multiple", color: "#F44336", icon: "list" },
   { id: "6", title: "Rastgele ?", route: "/pratik/random", color: "#009688", icon: "shuffle" },
 ]as const;

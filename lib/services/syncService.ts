@@ -1,168 +1,324 @@
+import { decode } from 'base64-arraybuffer';
+import { readAsStringAsync } from 'expo-file-system/legacy';
 import { db } from '../db';
-import * as CardRepo from '../repositories/cardRepository';
 import * as DeckRepo from '../repositories/deckRepository';
-import * as PracticeRepo from '../repositories/practiceRepository';
-import * as StatisticRepo from '../repositories/statisticRepository';
 import { useSyncStore } from '../store/syncStore';
+import { supabase } from '../supabase';
+import { Card, Deck, Practice, Statistic, User } from '../types';
 
-import { Card, Deck, Practice, Statistic } from '../types';
+const TABLES = {
+  users: 'users',
+  decks: 'decks',
+  cards: 'cards',
+  statistics: 'statistics',
+  practices: 'practices',
+};
 
-//Gerçek apı çağrısı burda yapılacaktır
+// --- YARDIMCI FONKSİYONLAR ---
 
-//Mock API
-const apiClient = {
+const uploadImage = async (localUri: string, userId: string): Promise<string | null> => {
+  try {
+    if (localUri.startsWith('http')) return localUri;
 
-  post: async (endpoint: string, data: any): Promise<{ cloud_id: string, [key: string]: any }> => {
-    console.log(`[API POST] ${endpoint}`, data);
-    await new Promise(r => setTimeout(r, 150));
-    return { ...data, cloud_id: `cloud_${endpoint.slice(1)}_${data.id || Math.random()}` };
-  },
-  put: async (endpoint: string, data: any): Promise<any> => {
-    console.log(`[API PUT] ${endpoint}`, data);
-    await new Promise(r => setTimeout(r, 150));
-    return data;
-  },
-  
-  delete: async (endpoint: string): Promise<void> => {
-    console.log(`[API DELETE] ${endpoint}`);
-    await new Promise(r => setTimeout(r, 150));
-  },
+    const fileName = `${userId}/${Date.now()}.jpg`;
+    const base64 = await readAsStringAsync(localUri, { encoding: 'base64' });
+    const arrayBuffer = decode(base64);
+
+    const { error } = await supabase.storage
+      .from('card-images')
+      .upload(fileName, arrayBuffer, { contentType: 'image/jpeg', upsert: true });
+
+    if (error) throw error;
+
+    const { data: { publicUrl } } = supabase.storage.from('card-images').getPublicUrl(fileName);
+    return publicUrl;
+  } catch (error) {
+    console.error('📸 [Upload] Hata:', error);
+    return null; 
+  }
 };
 
 export const checkHasPendingChanges = async (): Promise<boolean> => {
-  console.log("Bekleyen değişiklikler kontrol ediliyor...");
-  const tables = ['users', 'decks', 'cards', 'statistics', 'practices'];
   let totalPending = 0;
-
-  for (const table of tables) {
+  for (const table of Object.keys(TABLES)) {
     try {
       const result = await db.getFirstAsync<{ count: number }>(
         `SELECT COUNT(*) as count FROM ${table} WHERE sync_status != 'synced';`
       );
-      if (result && result.count > 0) {
-        totalPending += result.count;
-      }
-    } catch (error) {
-      console.error(`${table} kontrol edilirken hata:`, error);
+      if (result && result.count > 0) totalPending += result.count;
+    } catch (e: any) {
+      if (e.message && e.message.includes('no such table')) continue;
+      console.error(`${table} kontrol hatası:`, e);
     }
   }
-
   const hasChanges = totalPending > 0;
   useSyncStore.getState().setHasPendingChanges(hasChanges);
-  console.log(`Bekleyen değişiklik durumu: ${hasChanges} (${totalPending} kayıt)`);
   return hasChanges;
 };
 
-export const runFullSync = async () => {
-  const { isSyncing, setSyncing } = useSyncStore.getState();
-
-  if (isSyncing) {
-    console.log("Senkronizasyon zaten çalışıyor, atlanıyor.");
-    return;
-  }
-
-  const hasChanges = await checkHasPendingChanges();
-  if (!hasChanges) {
-    console.log("Senkronize edilecek değişiklik yok. Çıkılıyor.");
-    return;
-  }
-
-  setSyncing(true);
-  console.log("--- Tam Senkronizasyon Başlatıldı ---");
-
+// 1. YEREL KULLANICI GARANTİLEME
+export const ensureLocalUserExists = async () => {
   try {
-    const pendingDecks = await db.getAllAsync<Deck>(`SELECT * FROM decks WHERE sync_status != 'synced';`);
-    for (const deck of pendingDecks) {
-      await syncRecord('decks', deck, DeckRepo);
-    }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return null;
 
-    const pendingCards = await db.getAllAsync<Card>(`SELECT * FROM cards WHERE sync_status != 'synced';`);
-    for (const card of pendingCards) {
-      const parentDeck = await DeckRepo.getDeckById(card.deck_id);
-      
-      if (!parentDeck?.cloud_id) {
-        console.warn(`Kart ${card.id} atlanıyor: Ebeveyn deste ${card.deck_id} henüz senkronize olmamış.`);
-        continue;
-      }
-      
-      const cardPayload = { ...card, deck_cloud_id: parentDeck.cloud_id };
-      await syncRecord('cards', cardPayload, CardRepo);
-    }
+    const cloudId = session.user.id;
+    const email = session.user.email;
+    const name = session.user.user_metadata?.full_name || email?.split('@')[0];
 
-    const pendingStats = await db.getAllAsync<Statistic>(`SELECT * FROM statistics WHERE sync_status != 'synced';`);
-    for (const stat of pendingStats) {
-      await syncRecord('statistics', stat, StatisticRepo);
-    }
+    const existingUser = await db.getFirstAsync<User>(`SELECT * FROM users WHERE cloud_id = ?`, [cloudId]);
+    if (existingUser) return existingUser.id;
 
-    const pendingPractices = await db.getAllAsync<Practice>(`SELECT * FROM practices WHERE sync_status != 'synced';`);
-    for (const practice of pendingPractices) {
-      await syncRecord('practices', practice, PracticeRepo);
-    }
-
-    console.log("Senkronizasyon döngüsü tamamlandı.");
-
+    const now = new Date().toISOString();
+    const result = await db.runAsync(
+      `INSERT INTO users (cloud_id, name, email, last_modified, sync_status) VALUES (?, ?, ?, ?, 'synced')`,
+      [cloudId, name, email, now]
+    );
+    return result.lastInsertRowId;
   } catch (error) {
-    console.error("Senkronizasyon sırasında ciddi bir hata oluştu:", error);
-  } finally {
-    setSyncing(false);
-    await checkHasPendingChanges(); 
-    console.log("--- Tam Senkronizasyon Durduruldu ---");
+    console.error("Yerel kullanıcı hatası:", error);
+    return null;
   }
 };
 
-async function syncRecord(
-  endpoint: string, 
-  record: any & { id: number, cloud_id: string | null, sync_status: string },
-  Repo: any 
-) {
-  
-  const now = new Date().toISOString();
-  
+// --- PULL (İNDİRME) MANTIĞI ---
+
+// Tablodaki en son güncellenme tarihini bulur
+const getLatestLocalUpdateTime = async (table: string): Promise<string | null> => {
+    try {
+        const result = await db.getFirstAsync<{ max_date: string }>(
+            `SELECT MAX(last_modified) as max_date FROM ${table} WHERE sync_status = 'synced'`
+        );
+        return result?.max_date || null;
+    } catch (e) {
+        return null;
+    }
+};
+
+// Tek bir tabloyu buluttan çeker ve yerelle birleştirir
+const pullTable = async (table: string, userId: string, localUserId: number) => {
+    // 1. En son ne zaman güncelledik?
+    const lastUpdate = await getLatestLocalUpdateTime(table);
+    
+    // 2. Supabase sorgusu
+    let query = supabase
+        .from(table)
+        .select('*')
+        .eq('user_id', userId); // Sadece kendi verim
+
+    // Eğer daha önce çektiysek, sadece yenileri al (Incremental Sync)
+    if (lastUpdate) {
+        query = query.gt('last_modified', lastUpdate);
+    }
+
+    const { data: cloudData, error } = await query;
+    if (error) throw error;
+
+    if (!cloudData || cloudData.length === 0) return;
+
+    console.log(`⬇️ [PULL] ${table}: ${cloudData.length} yeni/değişen kayıt indiriliyor...`);
+
+    // 3. Yerel Veritabanına Yaz (UPSERT Mantığı)
+    for (const record of cloudData) {
+        // Silinmiş mi? (Soft Delete kontrolü - Eğer backend'de is_deleted varsa)
+        if (record.is_deleted) {
+            await db.runAsync(`DELETE FROM ${table} WHERE cloud_id = ?`, [record.id]);
+            continue;
+        }
+
+        // INSERT OR REPLACE mantığı için SQL hazırlığı
+        // SQLite'da 'cloud_id' UNIQUE olduğu için conflict durumunda update
+        
+        if (table === 'decks') {
+            await db.runAsync(`
+                INSERT INTO decks (cloud_id, user_id, name, description, goal, created_at, last_modified, sync_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'synced')
+                ON CONFLICT(cloud_id) DO UPDATE SET
+                name=excluded.name, description=excluded.description, goal=excluded.goal, last_modified=excluded.last_modified, sync_status='synced';
+            `, [record.id, localUserId, record.name, record.description, record.goal, record.created_at, record.last_modified]);
+        }
+        
+        else if (table === 'cards') {
+            // Önce yerel deck_id'yi bulma
+            const localDeck = await db.getFirstAsync<{id: number}>(`SELECT id FROM decks WHERE cloud_id = ?`, [record.deck_id]);
+            if (!localDeck) continue; // Destesi yoksa kartı ekleyemeyiz (Henüz inmemiştir)
+
+            await db.runAsync(`
+                INSERT INTO cards (cloud_id, deck_id, front_word, front_image, back_word, back_image, rating, interval, ease_factor, next_review, created_at, last_modified, sync_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')
+                ON CONFLICT(cloud_id) DO UPDATE SET
+                front_word=excluded.front_word, front_image=excluded.front_image, back_word=excluded.back_word, back_image=excluded.back_image,
+                interval=excluded.interval, ease_factor=excluded.ease_factor, next_review=excluded.next_review, last_modified=excluded.last_modified, sync_status='synced';
+            `, [record.id, localDeck.id, record.front_word, record.front_image, record.back_word, record.back_image, record.rating, record.interval, record.ease_factor, record.next_review, record.created_at, record.last_modified]);
+        }
+        
+        else if (table === 'statistics') {
+             await db.runAsync(`
+                INSERT INTO statistics (cloud_id, user_id, date, studied_card_count, added_card_count, learned_card_count, spent_time, practice_success_rate, deck_success_rate, last_modified, sync_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')
+                ON CONFLICT(cloud_id) DO UPDATE SET
+                studied_card_count=excluded.studied_card_count, added_card_count=excluded.added_card_count, spent_time=excluded.spent_time, last_modified=excluded.last_modified, sync_status='synced';
+            `, [record.id, localUserId, record.date, record.studied_card_count, record.added_card_count, record.learned_card_count, record.spent_time, record.practice_success_rate, record.deck_success_rate, record.last_modified]);
+        }
+
+        else if (table === 'practices') {
+            const localDeck = await db.getFirstAsync<{id: number}>(`SELECT id FROM decks WHERE cloud_id = ?`, [record.deck_id]);
+            const deckIdToUse = localDeck ? localDeck.id : null; // Deste silinmişse null olabilir
+
+             await db.runAsync(`
+                INSERT INTO practices (cloud_id, user_id, deck_id, date, duration, success_rate, last_modified, sync_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'synced')
+                ON CONFLICT(cloud_id) DO UPDATE SET
+                duration=excluded.duration, success_rate=excluded.success_rate, last_modified=excluded.last_modified, sync_status='synced';
+            `, [record.id, localUserId, deckIdToUse, record.date, record.duration, record.success_rate, record.last_modified]);
+        }
+    }
+};
+
+
+// 5. ANA SENKRONİZASYON (PUSH + PULL)
+export const runFullSync = async () => {
+  const { isSyncing, setSyncing } = useSyncStore.getState();
+  if (isSyncing) return;
+
+  setSyncing(true);
+  console.log("--- 🔄 Tam Senkronizasyon Başladı ---");
+
   try {
-    if (record.sync_status === 'pending_create') {
-      const { id: localId, cloud_id, sync_status, ...createPayload } = record;
-      
-      const response = await apiClient.post(`/${endpoint}`, createPayload);
-      
-      await db.runAsync(
-        `UPDATE ${endpoint} SET sync_status = 'synced', cloud_id = ?, last_modified = ? WHERE id = ?`,
-        [response.cloud_id, now, localId]
-      );
-      console.log(`[SYNC-CREATE] ${endpoint} #${localId} -> Bulut ID ${response.cloud_id} ile eşitlendi.`);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+    const userId = session.user.id;
 
-    } else if (record.sync_status === 'pending_update') {
-      const { id: localId, cloud_id, sync_status, ...updatePayload } = record;
-      
-      if (!cloud_id) {
-        console.error(`[SYNC-HATA] ${endpoint} #${localId}: Güncellenmek istendi ama cloud_id'si yok.`);
-        return; 
-      }
-      
-      await apiClient.put(`/${endpoint}/${cloud_id}`, updatePayload);
+    // 1. Yerel Kullanıcıyı Garantiye Al
+    const localUserId = await ensureLocalUserExists();
+    if (!localUserId) throw new Error("Yerel kullanıcı hatası");
 
-      await db.runAsync(
-        `UPDATE ${endpoint} SET sync_status = 'synced', last_modified = ? WHERE id = ?`,
-        [now, localId]
-      );
-      console.log(`[SYNC-UPDATE] ${endpoint} #${localId} (Bulut ID ${cloud_id}) eşitlendi.`);
+    // 2. Önce PUSH (Yereldeki değişiklikleri gönder)
+    await performPushSync(userId);
 
-    } else if (record.sync_status === 'pending_delete') {
-      const { id: localId, cloud_id } = record;
-      
-      if (!cloud_id) {
-      } else {
-        await apiClient.delete(`/${endpoint}/${cloud_id}`);
-      }
-      
-      await db.runAsync(`DELETE FROM ${endpoint} WHERE id = ?`, [localId]);
-      console.log(`[SYNC-DELETE] ${endpoint} #${localId} (Bulut ID ${cloud_id}) lokalden ve buluttan silindi.`);
-    }
+    // 3. Sonra PULL (Buluttaki değişiklikleri al)
+    // Sıralama Önemli: Önce Desteler, Sonra Kartlar (Foreign Key için)
+    await pullTable('decks', userId, localUserId);
+    await pullTable('cards', userId, localUserId);
+    await pullTable('statistics', userId, localUserId);
+    await pullTable('practices', userId, localUserId);
 
-  }catch (error) {
-    if (error instanceof Error) {
-      console.error(`[SYNC-HATA] ${endpoint} #${record.id} işlenirken hata:`, error.message);
+  } catch (error) {
+    console.error("Sync Critical Error:", error);
+  } finally {
+    setSyncing(false);
+    await checkHasPendingChanges();
+    console.log("--- ✅ Senkronizasyon Bitti ---");
+  }
+};
+
+
+// YARDIMCI: PUSH İŞLEMİ
+async function performPushSync(userId: string) {
+    const hasChanges = await checkHasPendingChanges();
+    if (!hasChanges) {
+        // console.log("   > Gönderilecek veri yok.");
+        // return; // Pull her zaman çalışmalı, o yüzden return etme
     } else {
-      console.error(`[SYNC-HATA] ${endpoint} #${record.id} bilinmeyen bir hata fırlattı:`, error);
+        console.log("   > ⬆️ Veriler Buluta Gönderiliyor (PUSH)...");
     }
+
+    // A. Users
+    const pendingUsers = await db.getAllAsync<User>(`SELECT * FROM users WHERE sync_status != 'synced' LIMIT 1;`);
+    for (const user of pendingUsers) await syncRecord('users', user, userId, null); 
+
+    // B. Decks
+    const pendingDecks = await db.getAllAsync<Deck>(`SELECT * FROM decks WHERE sync_status != 'synced';`);
+    for (const deck of pendingDecks) await syncRecord('decks', deck, userId, null);
+
+    // C. Cards
+    const pendingCards = await db.getAllAsync<Card>(`SELECT * FROM cards WHERE sync_status != 'synced';`);
+    for (const card of pendingCards) {
+      const parentDeck = await DeckRepo.getDeckById(card.deck_id);
+      if (!parentDeck?.cloud_id) continue;
+
+      let frontUrl = card.front_image;
+      let backUrl = card.back_image;
+
+      if (frontUrl && frontUrl.startsWith('file://')) {
+          const uploaded = await uploadImage(frontUrl, userId);
+          if (uploaded) frontUrl = uploaded;
+      }
+      if (backUrl && backUrl.startsWith('file://')) {
+          const uploaded = await uploadImage(backUrl, userId);
+          if (uploaded) backUrl = uploaded;
+      }
+
+      const payload = { 
+          ...card, 
+          front_image: frontUrl, 
+          back_image: backUrl,
+          deck_cloud_id: parentDeck.cloud_id 
+      };
+      
+      await syncRecord('cards', payload, userId, parentDeck.cloud_id);
+    }
+
+    // D. Statistics & Practices
+    const pendingStats = await db.getAllAsync<Statistic>(`SELECT * FROM statistics WHERE sync_status != 'synced';`);
+    for (const stat of pendingStats) await syncRecord('statistics', stat, userId, null);
+
+    const pendingPractices = await db.getAllAsync<Practice>(`SELECT * FROM practices WHERE sync_status != 'synced';`);
+    for (const practice of pendingPractices) {
+        const parentDeck = await DeckRepo.getDeckById(practice.deck_id);
+        if(!parentDeck?.cloud_id) continue;
+        await syncRecord('practices', practice, userId, parentDeck.cloud_id);
+    }
+}
+
+// TEKİL KAYIT İŞLEYİCİ (PUSH İÇİN)
+async function syncRecord(table: string, record: any, userId: string, parentCloudId: string | null) {
+  const now = new Date().toISOString();
+  try {
+    const { id: localId, cloud_id, sync_status, deck_id, user_id, deck_cloud_id, ...payload } = record;
+    const finalPayload: any = { ...payload, user_id: userId };
+
+    if (table === 'cards') {
+        if (finalPayload.easeFactor !== undefined) {
+            finalPayload.ease_factor = finalPayload.easeFactor; delete finalPayload.easeFactor;
+        }
+        if (finalPayload.nextReview !== undefined) {
+            finalPayload.next_review = finalPayload.nextReview; delete finalPayload.nextReview;
+        }
+        if (parentCloudId) finalPayload.deck_id = parentCloudId;
+    }
+    if (table === 'practices' && parentCloudId) finalPayload.deck_id = parentCloudId;
+    if (table === 'users') finalPayload.id = userId;
+
+    if (record.sync_status === 'pending_create') {
+        const { data, error } = await supabase.from(table).insert(finalPayload).select('id').single();
+        if (error) throw error;
+
+        let updateQuery = `UPDATE ${table} SET sync_status = 'synced', cloud_id = ?, last_modified = ?`;
+        const updateParams = [data.id, now];
+        if (table === 'cards') {
+            updateQuery += `, front_image = ?, back_image = ?`;
+            updateParams.push(finalPayload.front_image, finalPayload.back_image);
+        }
+        updateQuery += ` WHERE id = ?`;
+        updateParams.push(localId);
+        await db.runAsync(updateQuery, updateParams);
+    }
+    else if (record.sync_status === 'pending_update') {
+        if (!cloud_id) return;
+        const updateData = { ...finalPayload, last_modified: now };
+        const { error } = await supabase.from(table).update(updateData).eq('id', cloud_id);
+        if (error) throw error;
+        await db.runAsync(`UPDATE ${table} SET sync_status = 'synced', last_modified = ? WHERE id = ?`, [now, localId]);
+    }
+    else if (record.sync_status === 'pending_delete') {
+        if (cloud_id) {
+            const { error } = await supabase.from(table).delete().eq('id', cloud_id);
+            if (error) throw error;
+        }
+        await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, [localId]);
+    }
+  } catch (error) {
+    console.error(`Sync Error on ${table} #${record.id}:`, error);
   }
 }

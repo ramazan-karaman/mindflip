@@ -1,26 +1,31 @@
 import { SQLiteRunResult } from "expo-sqlite";
 
+// Senkronizasyon Durumları
 export type SyncStatus = 'pending_create' | 'pending_update' | 'pending_delete' | 'synced';
 
+// Tüm tabloların ortak atası
 export interface BaseRecord {
-  id: number;          
-  cloud_id: string | null; 
+  id: number;           // Yerel SQLite ID (Auto Increment)
+  cloud_id: string | null; // Supabase UUID
   last_modified: string; 
   sync_status: SyncStatus;
 }
 
 export interface Card extends BaseRecord {
   deck_id: number;
+  user_id?: string; 
   front_word: string;
   front_image: string | null;
   back_word: string;
   back_image: string | null;
   rating: string | null;
   created_at: string;
+  
   interval: number;
-  easeFactor: number;
-  nextReview: string;
+  ease_factor: number; // easeFactor -> ease_factor
+  next_review: string; // nextReview -> next_review
 }
+
 
 export interface Deck extends BaseRecord {
   user_id: number;
@@ -30,9 +35,11 @@ export interface Deck extends BaseRecord {
   created_at: string;
 }
 
+
 export interface DeckWithCardCount extends Deck {
   cardCount: number;
 }
+
 
 export interface Practice extends BaseRecord {
   user_id: number;
@@ -41,6 +48,7 @@ export interface Practice extends BaseRecord {
   duration: number; 
   success_rate: number | null;
 }
+
 
 export interface Statistic extends BaseRecord {
   user_id: number;
@@ -53,10 +61,10 @@ export interface Statistic extends BaseRecord {
   deck_success_rate: number | null;
 }
 
+
 export interface User extends BaseRecord {
   name: string | null;
   email: string | null;
-  password: string | null; // authentication yapılırken token yapılacak
   profile_photo: string | null;
 }
 

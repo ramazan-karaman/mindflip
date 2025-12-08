@@ -62,7 +62,7 @@ const CardComponent = React.memo(({
         transform: [{ translateX: offset.value }]
     }));
 
-    // Stiller
+    // Stiller 
     const baseCardStyle = { ...styles.card, height: cardHeight };
     const baseTextStyle = styles.cardText;
 

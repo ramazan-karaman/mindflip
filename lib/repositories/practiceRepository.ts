@@ -32,7 +32,6 @@ export const createPractice = async (
   }
 };
 
-
 export const getPracticeById = async (id: number): Promise<Practice | null> => {
   const query = `SELECT * FROM practices WHERE id = ? AND sync_status != 'pending_delete';`;
   try {
@@ -47,7 +46,8 @@ export const getPracticeById = async (id: number): Promise<Practice | null> => {
 export const getPractices = async (user_id: number): Promise<Practice[]> => {
   const query = `
     SELECT * FROM practices 
-    WHERE user_id = ? AND sync_status != 'pending_delete';
+    WHERE user_id = ? AND sync_status != 'pending_delete'
+    ORDER BY date DESC; -- En son pratikler üstte görünsün
   `;
   try {
     const allRows = await db.getAllAsync<Practice>(query, [user_id]);
@@ -57,7 +57,6 @@ export const getPractices = async (user_id: number): Promise<Practice[]> => {
     throw error;
   }
 };
-
 
 export const updatePractice = async (
   id: number, 
@@ -69,8 +68,8 @@ export const updatePractice = async (
   const query = `
     UPDATE practices SET 
       duration = ?, 
-      success_rate = ?,
-      last_modified = ?,
+      success_rate = ?, 
+      last_modified = ?, 
       sync_status = CASE 
                       WHEN sync_status = 'pending_create' THEN 'pending_create' 
                       ELSE 'pending_update' 
@@ -88,7 +87,6 @@ export const updatePractice = async (
   }
 };
 
-
 export const deletePractice = async (id: number): Promise<SQLiteRunResult> => {
   const now = new Date().toISOString();
   const query = `
@@ -100,7 +98,7 @@ export const deletePractice = async (id: number): Promise<SQLiteRunResult> => {
   `;
   try {
     const result = await db.runAsync(query, [now, id]);
-    console.log(`Pratik kaydı ${id} silinmek üzere işaretlendi (soft delete).`);
+    console.log(`Pratik kaydı ${id} silinmek üzere işaretlendi.`);
     return result;
   } catch (error) {
     console.error(`Pratik kaydı ${id} silinirken hata:`, error);

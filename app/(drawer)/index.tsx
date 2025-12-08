@@ -1,3 +1,4 @@
+import { useSyncStore } from '@/lib/store/syncStore';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
@@ -7,8 +8,8 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,16 +28,22 @@ import {
   MenuOptions,
   MenuTrigger,
 } from 'react-native-popup-menu';
+import 'react-native-url-polyfill/auto';
 import * as DeckRepository from '../../lib/repositories/deckRepository';
+import * as UserRepository from '../../lib/repositories/userRepository'; // UserRepo eklendi
 import { checkHasPendingChanges } from '../../lib/services/syncService';
+import { supabase } from '../../lib/supabase'; // Supabase eklendi
 import { DeckWithCardCount } from '../../lib/types';
 import { RootDrawerParamList } from './_layout';
+
 
 const { width } = Dimensions.get('window');
 
 export default function IndexScreen() {
   const navigation = useNavigation<DrawerNavigationProp<RootDrawerParamList>>();
   const queryClient = useQueryClient();
+
+  const isSyncing = useSyncStore(state => state.isSyncing);
 
   const [search, setSearch] = useState('');
   const [showSheet, setShowSheet] = useState(false);
@@ -46,24 +53,59 @@ export default function IndexScreen() {
   const [currentGoal, setCurrentGoal] = useState(1);
   const [maxGoal, setMaxGoal] = useState(1);
 
+  // Aktif kullanıcının yerel ID'sini tutmak için
+  const [localUserId, setLocalUserId] = useState<number | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
+
   const [newDeck, setNewDeck] = useState({
     name: '',
     description: '',
   });
 
+  // 1. Aktif Kullanıcıyı Bul (Supabase Auth -> Local DB)
+  useEffect(() => {
+    const fetchLocalUser = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+            const users = await UserRepository.getUsers();
+            if (users.length > 0) {
+                setLocalUserId(users[0].id);
+            }
+        }
+        setIsInitializing(false);
+    };
+    fetchLocalUser();
+  }, []);
+
+  useEffect(() => {
+    if (!isSyncing) {
+        queryClient.invalidateQueries({ queryKey: ['decks'] });
+    }
+  }, [isSyncing]);
+
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ['decks'] });
+    }, [])
+  );
+
   const {
     data: decks,
     isLoading: isLoadingDecks,
     isError: isErrorDecks,
+    refetch
   } = useQuery({
     queryKey: ['decks'],
     queryFn: DeckRepository.getDecks,
+    enabled: !isInitializing,
   });
 
   const { mutate: addDeckMutate, isPending: isAddingDeck } = useMutation({
     mutationFn: (deckData: { name: string; description: string }) => {
+      // Eğer localUserId yoksa (henüz yüklenmediyse veya hata varsa) 1 varsayalım
+      const userId = localUserId ?? 1; 
       return DeckRepository.createDeck(
-        1, 
+        userId, 
         deckData.name,
         deckData.description,
         0 
@@ -225,6 +267,14 @@ export default function IndexScreen() {
     </View>
   );
 
+  if (isInitializing) {
+      return (
+        <View style={styles.emptyContainer}>
+          <ActivityIndicator size="large" color="#2196F3" />
+        </View>
+      );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.searchRow}>
@@ -251,6 +301,13 @@ export default function IndexScreen() {
           )}
         </View>
       </View>
+
+      {isSyncing && (
+          <View style={{ padding: 10, alignItems: 'center', backgroundColor: '#E3F2FD' }}>
+              <Text style={{ color: '#2196F3', fontSize: 12 }}>Verileriniz indiriliyor...</Text>
+              <ActivityIndicator size="small" color="#2196F3" />
+          </View>
+      )}
 
       <Modal
         visible={isGoalModalVisible}
@@ -310,6 +367,13 @@ export default function IndexScreen() {
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderDeck}
         contentContainerStyle={{ paddingBottom: 80, padding: 4 }}
+
+        onRefresh={() => {
+            queryClient.invalidateQueries({ queryKey: ['decks'] });
+        }}
+        refreshing={isLoadingDecks}
+
+        //diğer sayfalara da ekle
         ListEmptyComponent={() =>
           isLoadingDecks ? (
             <View style={styles.emptyContainer}>

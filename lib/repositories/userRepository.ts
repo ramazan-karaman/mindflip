@@ -5,20 +5,19 @@ import { User } from '../types';
 export const createUser = async (
   name: string | null, 
   email: string | null, 
-  password: string | null,
   profile_photo: string | null
 ): Promise<User | null> => {
 
   const now = new Date().toISOString();
   const query = `
     INSERT INTO users (
-      name, email, password, profile_photo, 
+      name, email, profile_photo, 
       last_modified, sync_status
-    ) VALUES (?, ?, ?, ?, ?, 'pending_create');
+    ) VALUES (?, ?, ?, ?, 'pending_create');
   `;
   
   try {
-    const result = await db.runAsync(query, [name, email, password, profile_photo, now]);
+    const result = await db.runAsync(query, [name, email, profile_photo, now]);
     
     console.log(`Kullanıcı oluşturuldu: ID ${result.lastInsertRowId}`);
     return getUserById(result.lastInsertRowId);
@@ -58,7 +57,6 @@ export const updateUser = async (
   id: number, 
   name: string | null, 
   email: string | null, 
-  password: string | null,
   profile_photo: string | null
 ): Promise<SQLiteRunResult> => {
   
@@ -67,9 +65,8 @@ export const updateUser = async (
     UPDATE users SET 
       name = ?, 
       email = ?, 
-      password = ?, 
-      profile_photo = ?,
-      last_modified = ?,
+      profile_photo = ?, 
+      last_modified = ?, 
       sync_status = CASE 
                       WHEN sync_status = 'pending_create' THEN 'pending_create' 
                       ELSE 'pending_update' 
@@ -78,7 +75,7 @@ export const updateUser = async (
   `;
   
   try {
-    const result = await db.runAsync(query, [name, email, password, profile_photo, now, id]);
+    const result = await db.runAsync(query, [name, email, profile_photo, now, id]);
     console.log(`Kullanıcı ${id} güncellendi.`);
     return result;
   } catch (error) {

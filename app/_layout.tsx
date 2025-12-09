@@ -10,8 +10,10 @@ import 'react-native-url-polyfill/auto';
 
 import { Session } from '@supabase/supabase-js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import * as Linking from 'expo-linking';
 import { useOnlineManager } from '../hooks/useOnlineManager';
 import { initializeDatabase } from '../lib/db';
+import { importDatabaseFromUrl } from '../lib/services/backupService';
 import { checkHasPendingChanges, ensureLocalUserExists, runFullSync } from '../lib/services/syncService';
 import { supabase } from '../lib/supabase';
 
@@ -84,6 +86,26 @@ export default function RootLayout() {
       router.replace('/login');
     }
   }, [session, segments, isReady]);
+
+  useEffect(() => {
+  const handleDeepLink = async (event: { url: string }) => {
+    const url = event.url;
+    // Dosya uzantısı kontrolü
+    if (url && (url.endsWith('.mindflip') || url.includes('mindflip'))) {
+       await importDatabaseFromUrl(url);
+    }
+  };
+
+  // Uygulama açıksa dinle
+  const subscription = Linking.addEventListener('url', handleDeepLink);
+
+  // Uygulama kapalıyken açıldıysa (Cold Start)
+  Linking.getInitialURL().then((url) => {
+    if (url) handleDeepLink({ url });
+  });
+
+  return () => subscription.remove();
+}, []);
 
   if (!isReady) {
     return <Splash />;

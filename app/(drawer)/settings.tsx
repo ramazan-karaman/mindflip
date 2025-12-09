@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { clearDatabase } from '../../lib/db';
 import * as UserRepository from '../../lib/repositories/userRepository';
+import { exportDatabase, importDatabase } from '../../lib/services/backupService';
 import { runFullSync } from '../../lib/services/syncService';
 import { supabase } from '../../lib/supabase';
 
@@ -80,7 +81,7 @@ export default function SettingsScreen() {
   const handleDeleteAccount = async () => {
     Alert.alert(
       "Hesabı Sil",
-      "DİKKAT: Hesabınız ve tüm verileriniz (desteler, kartlar) KALICI OLARAK silinecektir. Bu işlem geri alınamaz.",
+      "DİKKAT: Hesabınız, tüm verileriniz ve fotoğraflarınız KALICI OLARAK silinecektir. Bu işlem geri alınamaz.",
       [
         { text: "Vazgeç", style: "cancel" },
         {
@@ -89,17 +90,59 @@ export default function SettingsScreen() {
           onPress: async () => {
              setIsBusy(true);
              try {
+                // 1. Kullanıcı Bilgisini Al (ID lazım)
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                if (user) {
+                    setBusyMessage("Fotoğraflar temizleniyor...");
+                    
+                    // --- STORAGE TEMİZLİĞİ (DÖNGÜSEL) ---
+                    // Supabase list() metodu varsayılan olarak 100 dosya getirir.
+                    // Hepsini silmek için dosya kalmayana kadar döngü kuruyoruz.
+                    while (true) {
+                        const { data: files, error: listError } = await supabase
+                            .storage
+                            .from('card-images')
+                            .list(user.id, { limit: 100 }); // Kullanıcının klasörü
+
+                        if (listError) {
+                            console.error("Listeme Hatası:", listError);
+                            break;
+                        }
+
+                        if (!files || files.length === 0) {
+                            console.log("Klasör boş veya silindi.");
+                            break; // Dosya kalmadı, döngüden çık
+                        }
+
+                        // Silinecek yolları hazırla: "user_id/dosya_adi.jpg"
+                        const filesToRemove = files.map(x => `${user.id}/${x.name}`);
+                        
+                        const { error: removeError } = await supabase
+                            .storage
+                            .from('card-images')
+                            .remove(filesToRemove);
+                            
+                        if (removeError) {
+                             console.error("Silme Hatası:", removeError);
+                             break;
+                        }
+                    }
+                    // -------------------------------------
+                }
+
                 setBusyMessage("Hesap siliniyor...");
 
-                // A. RPC Fonksiyonunu Çağır (Backend'de silme)
+                // 2. Veritabanından Sil (RPC)
+                // Bu işlem Cascade ile kartları, desteleri ve istatistikleri de siler.
                 const { error } = await supabase.rpc('delete_user');
                 if (error) throw error;
 
-                // B. Yerel veriyi temizle (SignOut'tan ÖNCE)
+                // 3. Yerel Temizlik
                 setBusyMessage("Cihaz temizleniyor...");
                 await clearDatabase();
                 
-                // C. Yerel oturumu kapat (Navigasyon tetiklenir)
+                // 4. Çıkış
                 await supabase.auth.signOut();
 
              } catch (error: any) {
@@ -153,6 +196,32 @@ export default function SettingsScreen() {
           <Text style={styles.email}>{user?.email || 'e-posta yok'}</Text>
         </View>
       </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Yerel Yedekleme (Offline)</Text>
+        
+        <TouchableOpacity style={styles.item} onPress={exportDatabase}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBox, { backgroundColor: '#E0F2F1' }]}>
+              <Ionicons name="download-outline" size={20} color="#009688" />
+            </View>
+            <Text style={styles.itemText}>Yedek Al (Dışa Aktar)</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#ccc" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.item} onPress={importDatabase}>
+          <View style={styles.itemLeft}>
+            <View style={[styles.iconBox, { backgroundColor: '#E0F2F1' }]}>
+              <Ionicons name="refresh-circle-outline" size={20} color="#009688" />
+            </View>
+            <Text style={styles.itemText}>Yedeği Geri Yükle</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#ccc" />
+        </TouchableOpacity>
+      </View>
+
+      
 
       {/* AYARLAR */}
       <View style={styles.section}>

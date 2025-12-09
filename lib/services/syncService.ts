@@ -14,13 +14,12 @@ const TABLES = {
   practices: 'practices',
 };
 
-// --- YARDIMCI FONKSİYONLAR ---
-
+// 1. YARDIMCI: Resim Yükleme
 const uploadImage = async (localUri: string, userId: string): Promise<string | null> => {
   try {
     if (localUri.startsWith('http')) return localUri;
 
-    const fileName = `${userId}/${Date.now()}.jpg`;
+    const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
     const base64 = await readAsStringAsync(localUri, { encoding: 'base64' });
     const arrayBuffer = decode(base64);
 
@@ -35,6 +34,23 @@ const uploadImage = async (localUri: string, userId: string): Promise<string | n
   } catch (error) {
     console.error('📸 [Upload] Hata:', error);
     return null; 
+  }
+};
+
+// 2. YARDIMCI: Resim Silme
+const deleteImageFromCloud = async (fullUrl: string | null) => {
+  if (!fullUrl || !fullUrl.includes('card-images')) return;
+
+  try {
+    const bucketName = 'card-images';
+    const path = fullUrl.split(`${bucketName}/`).pop();
+    if (!path) return;
+
+    const cleanPath = decodeURIComponent(path);
+    await supabase.storage.from(bucketName).remove([cleanPath]);
+
+  } catch (error) {
+    console.error("Resim silme hatası:", error);
   }
 };
 
@@ -56,7 +72,7 @@ export const checkHasPendingChanges = async (): Promise<boolean> => {
   return hasChanges;
 };
 
-// 1. YEREL KULLANICI GARANTİLEME
+// 3. YEREL KULLANICIYI GARANTİLE
 export const ensureLocalUserExists = async () => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -81,54 +97,33 @@ export const ensureLocalUserExists = async () => {
   }
 };
 
-// --- PULL (İNDİRME) MANTIĞI ---
-
-// Tablodaki en son güncellenme tarihini bulur
+// --- PULL (İNDİRME) ---
 const getLatestLocalUpdateTime = async (table: string): Promise<string | null> => {
     try {
         const result = await db.getFirstAsync<{ max_date: string }>(
             `SELECT MAX(last_modified) as max_date FROM ${table} WHERE sync_status = 'synced'`
         );
         return result?.max_date || null;
-    } catch (e) {
-        return null;
-    }
+    } catch (e) { return null; }
 };
 
-// Tek bir tabloyu buluttan çeker ve yerelle birleştirir
 const pullTable = async (table: string, userId: string, localUserId: number) => {
-    // 1. En son ne zaman güncelledik?
     const lastUpdate = await getLatestLocalUpdateTime(table);
-    
-    // 2. Supabase sorgusu
-    let query = supabase
-        .from(table)
-        .select('*')
-        .eq('user_id', userId); // Sadece kendi verim
-
-    // Eğer daha önce çektiysek, sadece yenileri al (Incremental Sync)
-    if (lastUpdate) {
-        query = query.gt('last_modified', lastUpdate);
-    }
+    let query = supabase.from(table).select('*').eq('user_id', userId);
+    if (lastUpdate) query = query.gt('last_modified', lastUpdate);
 
     const { data: cloudData, error } = await query;
     if (error) throw error;
-
     if (!cloudData || cloudData.length === 0) return;
 
-    console.log(`⬇️ [PULL] ${table}: ${cloudData.length} yeni/değişen kayıt indiriliyor...`);
+    console.log(`⬇️ [PULL] ${table}: ${cloudData.length} kayıt`);
 
-    // 3. Yerel Veritabanına Yaz (UPSERT Mantığı)
     for (const record of cloudData) {
-        // Silinmiş mi? (Soft Delete kontrolü - Eğer backend'de is_deleted varsa)
         if (record.is_deleted) {
             await db.runAsync(`DELETE FROM ${table} WHERE cloud_id = ?`, [record.id]);
             continue;
         }
 
-        // INSERT OR REPLACE mantığı için SQL hazırlığı
-        // SQLite'da 'cloud_id' UNIQUE olduğu için conflict durumunda update
-        
         if (table === 'decks') {
             await db.runAsync(`
                 INSERT INTO decks (cloud_id, user_id, name, description, goal, created_at, last_modified, sync_status)
@@ -137,12 +132,9 @@ const pullTable = async (table: string, userId: string, localUserId: number) => 
                 name=excluded.name, description=excluded.description, goal=excluded.goal, last_modified=excluded.last_modified, sync_status='synced';
             `, [record.id, localUserId, record.name, record.description, record.goal, record.created_at, record.last_modified]);
         }
-        
         else if (table === 'cards') {
-            // Önce yerel deck_id'yi bulma
             const localDeck = await db.getFirstAsync<{id: number}>(`SELECT id FROM decks WHERE cloud_id = ?`, [record.deck_id]);
-            if (!localDeck) continue; // Destesi yoksa kartı ekleyemeyiz (Henüz inmemiştir)
-
+            if (!localDeck) continue;
             await db.runAsync(`
                 INSERT INTO cards (cloud_id, deck_id, front_word, front_image, back_word, back_image, rating, interval, ease_factor, next_review, created_at, last_modified, sync_status)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced')
@@ -151,7 +143,6 @@ const pullTable = async (table: string, userId: string, localUserId: number) => 
                 interval=excluded.interval, ease_factor=excluded.ease_factor, next_review=excluded.next_review, last_modified=excluded.last_modified, sync_status='synced';
             `, [record.id, localDeck.id, record.front_word, record.front_image, record.back_word, record.back_image, record.rating, record.interval, record.ease_factor, record.next_review, record.created_at, record.last_modified]);
         }
-        
         else if (table === 'statistics') {
              await db.runAsync(`
                 INSERT INTO statistics (cloud_id, user_id, date, studied_card_count, added_card_count, learned_card_count, spent_time, practice_success_rate, deck_success_rate, last_modified, sync_status)
@@ -160,11 +151,9 @@ const pullTable = async (table: string, userId: string, localUserId: number) => 
                 studied_card_count=excluded.studied_card_count, added_card_count=excluded.added_card_count, spent_time=excluded.spent_time, last_modified=excluded.last_modified, sync_status='synced';
             `, [record.id, localUserId, record.date, record.studied_card_count, record.added_card_count, record.learned_card_count, record.spent_time, record.practice_success_rate, record.deck_success_rate, record.last_modified]);
         }
-
         else if (table === 'practices') {
             const localDeck = await db.getFirstAsync<{id: number}>(`SELECT id FROM decks WHERE cloud_id = ?`, [record.deck_id]);
-            const deckIdToUse = localDeck ? localDeck.id : null; // Deste silinmişse null olabilir
-
+            const deckIdToUse = localDeck ? localDeck.id : null;
              await db.runAsync(`
                 INSERT INTO practices (cloud_id, user_id, deck_id, date, duration, success_rate, last_modified, sync_status)
                 VALUES (?, ?, ?, ?, ?, ?, ?, 'synced')
@@ -175,8 +164,7 @@ const pullTable = async (table: string, userId: string, localUserId: number) => 
     }
 };
 
-
-// 5. ANA SENKRONİZASYON (PUSH + PULL)
+// --- ANA SYNC MOTORU ---
 export const runFullSync = async () => {
   const { isSyncing, setSyncing } = useSyncStore.getState();
   if (isSyncing) return;
@@ -189,19 +177,11 @@ export const runFullSync = async () => {
     if (!session?.user) return;
     const userId = session.user.id;
 
-    // 1. Yerel Kullanıcıyı Garantiye Al
     const localUserId = await ensureLocalUserExists();
     if (!localUserId) throw new Error("Yerel kullanıcı hatası");
 
-    // 2. Önce PUSH (Yereldeki değişiklikleri gönder)
     await performPushSync(userId);
-
-    // 3. Sonra PULL (Buluttaki değişiklikleri al)
-    // Sıralama Önemli: Önce Desteler, Sonra Kartlar (Foreign Key için)
-    await pullTable('decks', userId, localUserId);
-    await pullTable('cards', userId, localUserId);
-    await pullTable('statistics', userId, localUserId);
-    await pullTable('practices', userId, localUserId);
+    await pullFromCloud(userId, localUserId);
 
   } catch (error) {
     console.error("Sync Critical Error:", error);
@@ -212,16 +192,17 @@ export const runFullSync = async () => {
   }
 };
 
+async function pullFromCloud(userId: string, localUserId: number) {
+    await pullTable('decks', userId, localUserId);
+    await pullTable('cards', userId, localUserId);
+    await pullTable('statistics', userId, localUserId);
+    await pullTable('practices', userId, localUserId);
+}
 
-// YARDIMCI: PUSH İŞLEMİ
+// --- PUSH (PARALEL / HIZLI) ---
 async function performPushSync(userId: string) {
     const hasChanges = await checkHasPendingChanges();
-    if (!hasChanges) {
-        // console.log("   > Gönderilecek veri yok.");
-        // return; // Pull her zaman çalışmalı, o yüzden return etme
-    } else {
-        console.log("   > ⬆️ Veriler Buluta Gönderiliyor (PUSH)...");
-    }
+    if (hasChanges) console.log("   > ⬆️ Veriler Buluta Gönderiliyor (PUSH)...");
 
     // A. Users
     const pendingUsers = await db.getAllAsync<User>(`SELECT * FROM users WHERE sync_status != 'synced' LIMIT 1;`);
@@ -231,47 +212,54 @@ async function performPushSync(userId: string) {
     const pendingDecks = await db.getAllAsync<Deck>(`SELECT * FROM decks WHERE sync_status != 'synced';`);
     for (const deck of pendingDecks) await syncRecord('decks', deck, userId, null);
 
-    // C. Cards
+    // C. Cards (Paralel İşleme)
     const pendingCards = await db.getAllAsync<Card>(`SELECT * FROM cards WHERE sync_status != 'synced';`);
-    for (const card of pendingCards) {
-      const parentDeck = await DeckRepo.getDeckById(card.deck_id);
-      if (!parentDeck?.cloud_id) continue;
+    const CHUNK_SIZE = 5; 
+    for (let i = 0; i < pendingCards.length; i += CHUNK_SIZE) {
+        const chunk = pendingCards.slice(i, i + CHUNK_SIZE);
+        await Promise.all(chunk.map(async (card) => {
+            const parentDeck = await DeckRepo.getDeckById(card.deck_id);
+            if (!parentDeck?.cloud_id) return;
 
-      let frontUrl = card.front_image;
-      let backUrl = card.back_image;
+            let frontUrl = card.front_image;
+            let backUrl = card.back_image;
 
-      if (frontUrl && frontUrl.startsWith('file://')) {
-          const uploaded = await uploadImage(frontUrl, userId);
-          if (uploaded) frontUrl = uploaded;
-      }
-      if (backUrl && backUrl.startsWith('file://')) {
-          const uploaded = await uploadImage(backUrl, userId);
-          if (uploaded) backUrl = uploaded;
-      }
+            if (frontUrl && frontUrl.startsWith('file://')) {
+                const uploaded = await uploadImage(frontUrl, userId);
+                if (uploaded) frontUrl = uploaded;
+            }
+            if (backUrl && backUrl.startsWith('file://')) {
+                const uploaded = await uploadImage(backUrl, userId);
+                if (uploaded) backUrl = uploaded;
+            }
 
-      const payload = { 
-          ...card, 
-          front_image: frontUrl, 
-          back_image: backUrl,
-          deck_cloud_id: parentDeck.cloud_id 
-      };
-      
-      await syncRecord('cards', payload, userId, parentDeck.cloud_id);
+            const payload = { 
+                ...card, 
+                front_image: frontUrl, 
+                back_image: backUrl,
+                deck_cloud_id: parentDeck.cloud_id 
+            };
+            
+            await syncRecord('cards', payload, userId, parentDeck.cloud_id);
+        }));
     }
 
     // D. Statistics & Practices
     const pendingStats = await db.getAllAsync<Statistic>(`SELECT * FROM statistics WHERE sync_status != 'synced';`);
-    for (const stat of pendingStats) await syncRecord('statistics', stat, userId, null);
+    await Promise.all(pendingStats.map(stat => syncRecord('statistics', stat, userId, null)));
 
     const pendingPractices = await db.getAllAsync<Practice>(`SELECT * FROM practices WHERE sync_status != 'synced';`);
-    for (const practice of pendingPractices) {
-        const parentDeck = await DeckRepo.getDeckById(practice.deck_id);
-        if(!parentDeck?.cloud_id) continue;
-        await syncRecord('practices', practice, userId, parentDeck.cloud_id);
+    for (let i = 0; i < pendingPractices.length; i += 10) {
+        const chunk = pendingPractices.slice(i, i + 10);
+        await Promise.all(chunk.map(async (practice) => {
+            const parentDeck = await DeckRepo.getDeckById(practice.deck_id);
+            if(!parentDeck?.cloud_id) return;
+            await syncRecord('practices', practice, userId, parentDeck.cloud_id);
+        }));
     }
 }
 
-// TEKİL KAYIT İŞLEYİCİ (PUSH İÇİN)
+// TEKİL KAYIT İŞLEYİCİ
 async function syncRecord(table: string, record: any, userId: string, parentCloudId: string | null) {
   const now = new Date().toISOString();
   try {
@@ -293,26 +281,30 @@ async function syncRecord(table: string, record: any, userId: string, parentClou
     if (record.sync_status === 'pending_create') {
         const { data, error } = await supabase.from(table).insert(finalPayload).select('id').single();
         if (error) throw error;
-
-        let updateQuery = `UPDATE ${table} SET sync_status = 'synced', cloud_id = ?, last_modified = ?`;
-        const updateParams = [data.id, now];
-        if (table === 'cards') {
-            updateQuery += `, front_image = ?, back_image = ?`;
-            updateParams.push(finalPayload.front_image, finalPayload.back_image);
-        }
-        updateQuery += ` WHERE id = ?`;
-        updateParams.push(localId);
-        await db.runAsync(updateQuery, updateParams);
+        // Tip hatasını çözmek için data.id'yi string olarak algılaması için string template kullanabiliriz
+        // veya updateLocalStatus fonksiyonunun imzasını kontrol edebiliriz.
+        await updateLocalStatus(table, localId, data.id as string, now, finalPayload);
     }
     else if (record.sync_status === 'pending_update') {
         if (!cloud_id) return;
-        const updateData = { ...finalPayload, last_modified: now };
-        const { error } = await supabase.from(table).update(updateData).eq('id', cloud_id);
+        const upsertData = { ...finalPayload, id: cloud_id, last_modified: now };
+        const { error } = await supabase.from(table).upsert(upsertData);
         if (error) throw error;
-        await db.runAsync(`UPDATE ${table} SET sync_status = 'synced', last_modified = ? WHERE id = ?`, [now, localId]);
+        await updateLocalStatus(table, localId, null, now, null);
     }
     else if (record.sync_status === 'pending_delete') {
         if (cloud_id) {
+            if (table === 'cards') {
+                if (record.front_image) await deleteImageFromCloud(record.front_image);
+                if (record.back_image) await deleteImageFromCloud(record.back_image);
+            }
+            else if (table === 'decks') {
+                const cardsInDeck = await db.getAllAsync<Card>(`SELECT front_image, back_image FROM cards WHERE deck_id = ?`, [localId]);
+                for (const card of cardsInDeck) {
+                    if (card.front_image) await deleteImageFromCloud(card.front_image);
+                    if (card.back_image) await deleteImageFromCloud(card.back_image);
+                }
+            }
             const { error } = await supabase.from(table).delete().eq('id', cloud_id);
             if (error) throw error;
         }
@@ -321,4 +313,25 @@ async function syncRecord(table: string, record: any, userId: string, parentClou
   } catch (error) {
     console.error(`Sync Error on ${table} #${record.id}:`, error);
   }
+}
+
+// 6. GÜNCELLEME YARDIMCISI
+async function updateLocalStatus(table: string, localId: number, cloudId: string | null, now: string, payload: any) {
+    let query = `UPDATE ${table} SET sync_status = 'synced', last_modified = ?`;
+    const params: any[] = [now];
+    
+    if (cloudId) {
+        query += `, cloud_id = ?`;
+        params.push(cloudId);
+    }
+    
+    if (table === 'cards' && payload) {
+        query += `, front_image = ?, back_image = ?`;
+        params.push(payload.front_image, payload.back_image);
+    }
+
+    query += ` WHERE id = ?`;
+    params.push(localId);
+
+    await db.runAsync(query, params);
 }

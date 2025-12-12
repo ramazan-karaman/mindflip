@@ -1,15 +1,28 @@
 {
   "expo": {
-    "name": "project1",
-    "slug": "project1",
+    "name": "MindFlip",
+    "slug": "mindflip",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "project1",
+    "scheme": "mindflip",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.blackman47.project1",
+      "infoPlist": {
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "CSV File",
+            "LSItemContentTypes": [
+              "public.comma-separated-values-text",
+              "text/csv"
+            ],
+            "LSHandlerRank": "Owner"
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +33,39 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.blackman47.project1"
+      "package": "com.blackman47.project1",
+      "intentFilters": [
+        {
+          "action": "SEND",
+          "data": {
+            "mimeType": "text/*"
+          }
+        },
+        {
+          "action": "SEND",
+          "data": {
+            "mimeType": "text/csv"
+          }
+        },
+        {
+          "action": "SEND",
+          "data": {
+            "mimeType": "text/comma-separated-values"
+          }
+        },
+        {
+          "action": "SEND",
+          "data": {
+            "mimeType": "application/csv"
+          }
+        },
+        {
+          "action": "SEND",
+          "data": {
+            "mimeType": "application/vnd.ms-excel"
+          }
+        }
+      ]
     },
     "web": {
       "output": "static",
@@ -40,11 +85,25 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-document-picker",
+      [
+        "expo-share-intent",
+        {
+          "android": {
+            "disableAdditionalIntentFilters": true
+          },
+          "ios": {
+            "activationRules": {
+              "predicates": "ANY $attachment.registeredTypeIdentifiers UTICONFORMSTO \"public.comma-separated-values-text\""
+            }
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     }
   }
 }

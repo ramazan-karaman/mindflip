@@ -1,35 +1,52 @@
 import { SQLiteRunResult } from 'expo-sqlite';
+// DEĞİŞİKLİK: File sınıfını alıyoruz
+import { File } from 'expo-file-system';
 import { db } from '../db';
 import { Deck, DeckWithCardCount } from '../types';
+import * as CardRepository from './cardRepository';
+
+// --- GÜNCELLENMİŞ SİLME YARDIMCISI ---
+const deleteImageFile = async (uri: string | null) => {
+  if (!uri) return;
+  try {
+    const file = new File(uri);
+    if (file.exists) {
+        await file.delete();
+        // Log kirliliği olmaması için buradaki logu kaldırabilir veya azaltabilirsin
+    }
+  } catch (error) {
+    console.warn(`Dosya silinemedi: ${uri}`, error);
+  }
+};
+
+// --- CRUD İŞLEMLERİ ---
 
 export const createDeck = async (
-  user_id: number,
   name: string,
   description: string | null,
   goal: number | null
 ): Promise<Deck | null> => {
   const now = new Date().toISOString();
+  
   const query = `
-    INSERT INTO decks (user_id, name, description, goal, created_at, last_modified, sync_status)
-    VALUES (?, ?, ?, ?, ?, ?, 'pending_create');
+    INSERT INTO decks (name, description, goal, created_at)
+    VALUES (?, ?, ?, ?);
   `;
 
   try {
-    const result = await db.runAsync(query, [user_id, name, description, goal, now, now]);
+    const result = await db.runAsync(query, [name, description, goal, now]);
     console.log(`Deste oluşturuldu: ID ${result.lastInsertRowId}`);
     return getDeckById(result.lastInsertRowId);
   } catch (error) {
-    console.error(`Deste ${name} oluşturulurken hata:`, error);
+    console.error(`Deste hatası:`, error);
     throw error;
   }
 };
 
 export const getDecks = async (): Promise<DeckWithCardCount[]> => {
-  // Alt sorgu ile kart sayısını çekme
   const query = `
-    SELECT d.*, (SELECT COUNT(c.id) FROM cards c WHERE c.deck_id = d.id AND c.sync_status != 'pending_delete') as cardCount 
+    SELECT d.*, (SELECT COUNT(c.id) FROM cards c WHERE c.deck_id = d.id) as cardCount 
     FROM decks d 
-    WHERE d.sync_status != 'pending_delete'
     ORDER BY d.name ASC;
   `;
 
@@ -37,18 +54,19 @@ export const getDecks = async (): Promise<DeckWithCardCount[]> => {
     const result = await db.getAllAsync<DeckWithCardCount>(query);
     return result;
   } catch (error) {
-    console.error(`Desteler alınırken hata oluştu:`, error);
+    console.error(`Desteler alınırken hata:`, error);
     throw error;
   }
 };
 
 export const getDeckById = async (id: number): Promise<Deck | null> => {
-  const query = `SELECT * FROM decks WHERE id = ? AND sync_status != 'pending_delete';`;
+  const query = `SELECT * FROM decks WHERE id = ?;`;
+  
   try {
     const result = await db.getFirstAsync<Deck>(query, [id]);
     return result ?? null;
   } catch (error) {
-    console.error(`Deste ${id} alınırken hata:`, error);
+    console.error(`Deste alınırken hata:`, error);
     throw error;
   }
 };
@@ -59,42 +77,49 @@ export const updateDeck = async (
   description: string | null,
   goal: number | null
 ): Promise<SQLiteRunResult> => {
-  const now = new Date().toISOString();
+  
   const query = `
     UPDATE decks SET 
-      name = ?, 
-      description = ?, 
-      goal = ?, 
-      last_modified = ?, 
-      sync_status = CASE WHEN sync_status = 'pending_create' THEN 'pending_create' 
-      ELSE 'pending_update' END WHERE id = ?;`;
+    name = ?, 
+    description = ?, 
+    goal = ? 
+    WHERE id = ?;
+  `;
 
   try {
-    const result = await db.runAsync(query, [name, description, goal, now, id]);
+    const result = await db.runAsync(query, [name, description, goal, id]);
     console.log(`Deste ${id} güncellendi.`);
     return result;
   } catch (error) {
-    console.error(`Deste ${id} güncellenirken hata:`, error);
+    console.error(`Deste güncelleme hatası:`, error);
     throw error;
   }
 };
 
+// --- SİLME İŞLEMİ ---
 export const deleteDeck = async (id: number): Promise<SQLiteRunResult> => {
-  const now = new Date().toISOString();
-  const query = `
-    UPDATE decks 
-    SET sync_status = 'pending_delete', last_modified = ? 
-    WHERE id = ?;`;
-
   try {
-    const result = await db.runAsync(query, [now, id]);
-    await db.runAsync(`UPDATE cards SET sync_status = 'pending_delete', last_modified = ? WHERE deck_id = ?`, [now, id]);
+    // 1. Kartları ve resimlerini bul
+    const cardsInDeck = await CardRepository.getCardByIdDeck(id);
+
+    // 2. Resim dosyalarını temizle
+    if (cardsInDeck.length > 0) {
+        console.log(`Deste siliniyor. ${cardsInDeck.length} kartın resimleri temizleniyor...`);
+        for (const card of cardsInDeck) {
+            await deleteImageFile(card.front_image);
+            await deleteImageFile(card.back_image);
+        }
+    }
+
+    // 3. Veritabanından sil (Cascade)
+    const query = `DELETE FROM decks WHERE id = ?;`;
+    const result = await db.runAsync(query, [id]);
     
-    console.log(`Deste ${id} ve kartları silinmek üzere işaretlendi.`);
+    console.log(`Deste ${id} ve içeriği temizlendi.`);
     return result;
 
   } catch (error) {
-    console.error(`Deste ${id} silinirken hata:`, error);
+    console.error(`Deste silme hatası:`, error);
     throw error;
   }
-}
+};

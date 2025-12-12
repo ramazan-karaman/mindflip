@@ -2,28 +2,25 @@ import { SQLiteRunResult } from 'expo-sqlite';
 import { db } from '../db';
 import { Practice } from '../types';
 
+// Yeni pratik kaydı oluşturma
+// Not: user_id kaldırıldı.
 export const createPractice = async (
-  user_id: number, 
   deck_id: number, 
   date: string, 
   duration: number, 
   success_rate: number | null
 ): Promise<Practice | null> => {
 
-  const now = new Date().toISOString();
+  // sync_status ve last_modified kaldırıldı.
   const query = `
-    INSERT INTO practices (
-      user_id, deck_id, date, duration, success_rate, 
-      last_modified, sync_status
-    ) VALUES (?, ?, ?, ?, ?, ?, 'pending_create');
+    INSERT INTO practices (deck_id, date, duration, success_rate) 
+    VALUES (?, ?, ?, ?);
   `;
   
   try {
-    const result = await db.runAsync(query, [
-      user_id, deck_id, date, duration, success_rate, now
-    ]);
+    const result = await db.runAsync(query, [deck_id, date, duration, success_rate]);
     
-    console.log(`Pratik kaydı oluşturuldu: ID ${result.lastInsertRowId}`);
+    console.log(`Pratik kaydı oluşturuldu (Local): ID ${result.lastInsertRowId}`);
     return getPracticeById(result.lastInsertRowId);
 
   } catch (error) {
@@ -32,8 +29,11 @@ export const createPractice = async (
   }
 };
 
+// ID'ye göre tekil pratik kaydı getirme
 export const getPracticeById = async (id: number): Promise<Practice | null> => {
-  const query = `SELECT * FROM practices WHERE id = ? AND sync_status != 'pending_delete';`;
+  // Sync filtresi kaldırıldı
+  const query = `SELECT * FROM practices WHERE id = ?;`;
+  
   try {
     const practice = await db.getFirstAsync<Practice>(query, [id]);
     return practice ?? null;
@@ -43,42 +43,57 @@ export const getPracticeById = async (id: number): Promise<Practice | null> => {
   }
 };
 
-export const getPractices = async (user_id: number): Promise<Practice[]> => {
+// Tüm pratik geçmişini getirme (Genel Tarihçe)
+// Not: user_id parametresi kaldırıldı. En yeniden eskiye sıralar.
+export const getAllPractices = async (): Promise<Practice[]> => {
   const query = `
     SELECT * FROM practices 
-    WHERE user_id = ? AND sync_status != 'pending_delete'
-    ORDER BY date DESC; -- En son pratikler üstte görünsün
+    ORDER BY date DESC;
   `;
+  
   try {
-    const allRows = await db.getAllAsync<Practice>(query, [user_id]);
+    const allRows = await db.getAllAsync<Practice>(query);
     return allRows;
   } catch (error) {
-    console.error(`Kullanıcı ${user_id} için pratik kayıtları alınırken hata:`, error);
+    console.error(`Tüm pratik kayıtları alınırken hata:`, error);
     throw error;
   }
 };
 
+// Belirli bir desteye ait pratik geçmişini getirme
+export const getPracticesByDeckId = async (deck_id: number): Promise<Practice[]> => {
+  const query = `
+    SELECT * FROM practices 
+    WHERE deck_id = ? 
+    ORDER BY date DESC;
+  `;
+  
+  try {
+    const rows = await db.getAllAsync<Practice>(query, [deck_id]);
+    return rows;
+  } catch (error) {
+    console.error(`Deste ${deck_id} için pratik kayıtları alınırken hata:`, error);
+    throw error;
+  }
+};
+
+// Pratik kaydı güncelleme
 export const updatePractice = async (
   id: number, 
   duration: number, 
   success_rate: number | null
 ): Promise<SQLiteRunResult> => {
   
-  const now = new Date().toISOString();
+  // Sync ve tarihçe mantığı temizlendi
   const query = `
     UPDATE practices SET 
       duration = ?, 
-      success_rate = ?, 
-      last_modified = ?, 
-      sync_status = CASE 
-                      WHEN sync_status = 'pending_create' THEN 'pending_create' 
-                      ELSE 'pending_update' 
-                    END
+      success_rate = ?
     WHERE id = ?;
   `;
   
   try {
-    const result = await db.runAsync(query, [duration, success_rate, now, id]);
+    const result = await db.runAsync(query, [duration, success_rate, id]);
     console.log(`Pratik kaydı ${id} güncellendi.`);
     return result;
   } catch (error) {
@@ -87,18 +102,13 @@ export const updatePractice = async (
   }
 };
 
+// Pratik kaydı silme (Hard Delete)
 export const deletePractice = async (id: number): Promise<SQLiteRunResult> => {
-  const now = new Date().toISOString();
-  const query = `
-    UPDATE practices 
-    SET 
-      sync_status = 'pending_delete',
-      last_modified = ?
-    WHERE id = ?;
-  `;
+  const query = `DELETE FROM practices WHERE id = ?;`;
+  
   try {
-    const result = await db.runAsync(query, [now, id]);
-    console.log(`Pratik kaydı ${id} silinmek üzere işaretlendi.`);
+    const result = await db.runAsync(query, [id]);
+    console.log(`Pratik kaydı ${id} silindi.`);
     return result;
   } catch (error) {
     console.error(`Pratik kaydı ${id} silinirken hata:`, error);

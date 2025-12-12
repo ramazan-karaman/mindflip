@@ -25,53 +25,12 @@ import {
 } from '@tanstack/react-query';
 import * as CardRepository from '../../lib/repositories/cardRepository';
 import * as DeckRepository from '../../lib/repositories/deckRepository';
-import { checkHasPendingChanges } from '../../lib/services/syncService';
 import { Card } from '../../lib/types';
 
-// SRS Algoritması (SM-2 Varyasyonu)
-const calculateSRS = (card: Card, quality: number) => {
-  // DÜZELTME: Veritabanından snake_case (ease_factor) olarak geliyor
-  const currentEaseFactor =
-    typeof card.ease_factor === 'number' && !isNaN(card.ease_factor)
-      ? card.ease_factor
-      : 2.5;
-      
-  const currentInterval =
-    typeof card.interval === 'number' && !isNaN(card.interval)
-      ? card.interval
-      : 1; // Kart yeniyse interval 0 veya null olabilir, 1 ile başlat.
+// YENİ: Servisi import et
+import { calculateNextReview } from '../../lib/services/srsService';
 
-  let newInterval: number;
-  let newEaseFactor: number = currentEaseFactor;
-
-  if (quality >= 3) {
-    // Doğru bildi
-    if (currentInterval < 1) {
-      newInterval = 1;
-    } else if (currentInterval === 1) {
-      newInterval = 6;
-    } else {
-      newInterval = Math.round(currentInterval * currentEaseFactor);
-    }
-    // Ease Factor güncellemesi
-    newEaseFactor = currentEaseFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
-  } else {
-    // Yanlış bildi (Sıfırla)
-    newInterval = 1; // 0.5 yerine 1 güne çekmek genelde daha güvenlidir, ama algoritmana göre 0.5 de kalabilir.
-    newEaseFactor = Math.max(1.3, currentEaseFactor - 0.2);
-  }
-
-  if (newEaseFactor < 1.3) newEaseFactor = 1.3;
-
-  const nextReviewDate = new Date();
-  nextReviewDate.setDate(nextReviewDate.getDate() + newInterval);
-
-  return {
-    interval: newInterval,
-    easeFactor: newEaseFactor, // Repository camelCase bekliyor
-    nextReview: nextReviewDate.toISOString(), // Repository camelCase bekliyor
-  };
-};
+// --- (ESKİ calculateSRS FONKSİYONUNU SİL) ---
 
 export default function ClassicScreen() {
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
@@ -82,9 +41,9 @@ export default function ClassicScreen() {
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-
   const rotate = useSharedValue(0);
 
+  // --- AKILLI ÇALIŞMA KUYRUĞU (Smart Bucket) ---
   const {
     data: practiceQueue,
     isLoading,
@@ -94,59 +53,16 @@ export default function ClassicScreen() {
     queryFn: async () => {
       if (isNaN(id)) throw new Error('Geçersiz Deste ID');
 
+      // 1. Hedefi al
       const currentDeck = await DeckRepository.getDeckById(id);
-      if (!currentDeck) throw new Error('Deste bulunamadı');
+      const sessionLimit = (currentDeck?.goal && currentDeck.goal > 0) ? currentDeck.goal : 10;
 
-      const userGoal = currentDeck.goal ?? 0;
-      const goal = userGoal > 0 ? userGoal : 5;
+      // 2. Akıllı kuyruğu veritabanından çek (3 Adımlı Lojik)
+      // cardRepository'e eklediğimiz getSmartPracticeQueue fonksiyonu
+      const queue = await CardRepository.getSmartPracticeQueue(id, sessionLimit);
 
-      const allCards: Card[] = await CardRepository.getCardByIdDeck(id);
-      if (allCards.length === 0) {
-        return [];
-      }
-
-      const now = new Date();
-
-      // DÜZELTME: next_review (snake_case) kullanımı
-      const dueCards = allCards.filter(
-        (card) => !card.next_review || new Date(card.next_review) <= now
-      );
-
-      let finalQueue = [...dueCards];
-
-      // Eğer hedef dolmadıysa yeni kart ekle
-      if (dueCards.length < goal) { 
-        const cardsNeeded = goal - dueCards.length; 
-
-        const newCards = allCards
-          .filter((card) => !dueCards.find((dueCard) => dueCard.id === card.id))
-          .sort(
-            (a, b) =>
-              new Date(a.created_at).getTime() -
-              new Date(b.created_at).getTime()
-          );
-
-        const newCardsToPractice = newCards.slice(0, cardsNeeded);
-        finalQueue.push(...newCardsToPractice);
-      }
-
-      // Eğer hala kart yoksa, gelecekteki kartlardan (Bonus) çek
-      if (finalQueue.length === 0) {
-        console.log(
-          'Çalışılacak kart bulunamadı, hedefe göre bonus tur oluşturuluyor...'
-        );
-        const bonusCards = allCards
-          .sort(
-            (a, b) =>
-              // DÜZELTME: next_review (snake_case)
-              new Date(a.next_review).getTime() -
-              new Date(b.next_review).getTime()
-          )
-          .slice(0, goal);
-        finalQueue = bonusCards;
-      }
-
-      return finalQueue.sort(() => Math.random() - 0.5);
+      // 3. Karıştır ve Sun
+      return queue.sort(() => Math.random() - 0.5);
     },
     enabled: !isNaN(id),
   });
@@ -167,12 +83,9 @@ export default function ClassicScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cards', id] });
       queryClient.invalidateQueries({ queryKey: ['decks'] });
-      // Senkronizasyonu tetikle
-      checkHasPendingChanges();
     },
     onError: (error) => {
-      console.error('SRS güncellenirken hata:', error);
-      Alert.alert('Hata', 'Kart ilerlemesi kaydedilemedi.');
+      console.error('SRS hatası:', error);
     },
   });
 
@@ -201,7 +114,8 @@ export default function ClassicScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
 
-    const { interval, easeFactor, nextReview } = calculateSRS(
+    // YENİ: Servis üzerinden hesaplama yapılıyor
+    const { interval, easeFactor, nextReview } = calculateNextReview(
       currentCard,
       quality
     );
@@ -220,17 +134,23 @@ export default function ClassicScreen() {
     } else {
       Alert.alert(
         'Tebrikler!',
-        'Bu pratik seansını tamamladın.',
-        [{ text: 'Harika!', onPress: () => navigation.goBack() }]
+        'Bu oturumu başarıyla tamamladın.',
+        [{ text: 'Çıkış', onPress: () => navigation.goBack() }]
       );
     }
+  };
+
+  // Kartın Bonus olup olmadığını kontrol et
+  const isBonusCard = (card: Card) => {
+    if (!card.nextReview) return false; 
+    return new Date(card.nextReview).getTime() > new Date().getTime();
   };
 
   if (isLoading) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#2196F3" />
-        <Text style={styles.infoText}>Pratik kartları hazırlanıyor...</Text>
+        <Text style={styles.infoText}>Akıllı oturum hazırlanıyor...</Text>
       </View>
     );
   }
@@ -239,7 +159,7 @@ export default function ClassicScreen() {
     return (
       <View style={styles.container}>
         <Ionicons name="alert-circle-outline" size={64} color="red" />
-        <Text style={styles.infoText}>Pratik yüklenirken bir hata oluştu.</Text>
+        <Text style={styles.infoText}>Hata oluştu.</Text>
       </View>
     );
   }
@@ -247,86 +167,89 @@ export default function ClassicScreen() {
   if (!practiceQueue || practiceQueue.length === 0) {
     return (
       <View style={styles.container}>
-        <Ionicons name="checkmark-done-circle-outline" size={64} color="green" />
-        <Text style={styles.infoText}>
-          Bu destede şu an çalışılacak kart bulunmuyor.
-        </Text>
+        <Ionicons name="layers-outline" size={64} color="#ccc" />
+        <Text style={styles.infoText}>Bu destede hiç kart yok.</Text>
       </View>
     );
   }
 
   const currentCard = practiceQueue[currentIndex];
-  if (!currentCard) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.infoText}>Pratik tamamlandı.</Text>
-      </View>
-    );
-  }
+  if (!currentCard) return <View style={styles.container} />;
+
+  const bonus = isBonusCard(currentCard);
 
   return (
     <View style={styles.container}>
-      {practiceQueue.length > 0 && (
+      {/* Üst Bilgi */}
+      <View style={styles.topInfoContainer}>
+        {bonus && (
+            <View style={styles.bonusBadge}>
+                <Ionicons name="flash" size={12} color="#FF9800" style={{marginRight: 4}} />
+                <Text style={styles.bonusText}>PEKİŞTİRME</Text>
+            </View>
+        )}
         <View style={styles.progressContainer}>
-          <Text style={styles.progressText}>
+            <Text style={styles.progressText}>
             {currentIndex + 1} / {practiceQueue.length}
-          </Text>
+            </Text>
         </View>
-      )}
+      </View>
+
       <TouchableOpacity onPress={flipCard} activeOpacity={0.9}>
+        {/* ÖN YÜZ */}
         <Animated.View style={[styles.card, frontAnimatedStyle]}>
-          <Image
-            source={
-              currentCard.front_image
-                ? { uri: currentCard.front_image }
-                : require('../../assets/images/mindfliplogo.png')
-            }
-            style={styles.image}
-          />
+          {currentCard.front_image ? (
+             <Image
+             source={{ uri: currentCard.front_image }}
+             style={styles.image}
+             resizeMode="cover"
+           />
+          ) : (
+            <Image
+                source={require('../../assets/images/mindfliplogo.png')}
+                style={[styles.image, {opacity: 0.1}]}
+                resizeMode="contain"
+            />
+          )}
           <Text style={styles.termText}>{currentCard.front_word}</Text>
         </Animated.View>
+
+        {/* ARKA YÜZ */}
         <Animated.View style={[styles.card, styles.cardBack, backAnimatedStyle]}>
-          <Image
-            source={
-              currentCard.back_image
-                ? { uri: currentCard.back_image }
-                : require('../../assets/images/mindfliplogo.png')
-            }
-            style={styles.image}
-          />
+           {currentCard.back_image ? (
+             <Image
+             source={{ uri: currentCard.back_image }}
+             style={styles.image}
+             resizeMode="cover"
+           />
+          ) : (
+            <Image
+                source={require('../../assets/images/mindfliplogo.png')}
+                style={[styles.image, {opacity: 0.1}]}
+                resizeMode="contain"
+            />
+          )}
           <Text style={styles.termText}>{currentCard.back_word}</Text>
         </Animated.View>
       </TouchableOpacity>
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={[
-            styles.button,
-            styles.hardButton,
-            !isFlipped && styles.disabledButton,
-          ]}
+          style={[styles.button, styles.hardButton, !isFlipped && styles.disabledButton]}
           disabled={!isFlipped}
           onPress={() => handleReview(1)}
         >
           <Text style={styles.buttonText}>Zor</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[
-            styles.button,
-            styles.normalButton,
-            !isFlipped && styles.disabledButton,
-          ]}
+          style={[styles.button, styles.normalButton, !isFlipped && styles.disabledButton]}
           disabled={!isFlipped}
           onPress={() => handleReview(3)}
         >
           <Text style={styles.buttonText}>Normal</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[
-            styles.button,
-            styles.easyButton,
-            !isFlipped && styles.disabledButton,
-          ]}
+          style={[styles.button, styles.easyButton, !isFlipped && styles.disabledButton]}
           disabled={!isFlipped}
           onPress={() => handleReview(5)}
         >
@@ -338,6 +261,7 @@ export default function ClassicScreen() {
 }
 
 const styles = StyleSheet.create({
+  // ... (Stiller aynı kalabilir)
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -345,10 +269,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f4f8',
     padding: 20,
   },
-  infoText: { fontSize: 18, color: '#555', textAlign: 'center' },
+  infoText: { fontSize: 18, color: '#555', textAlign: 'center', marginTop: 20 },
   card: {
     width: 320,
-    height: 400,
+    height: 420,
     backgroundColor: 'white',
     borderRadius: 20,
     justifyContent: 'center',
@@ -357,6 +281,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     backfaceVisibility: 'hidden',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.23,
+    shadowRadius: 2.62,
+    elevation: 4,
   },
   cardBack: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   image: {
@@ -364,38 +293,67 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 15,
     marginBottom: 20,
-    backgroundColor: '#eee',
+    backgroundColor: '#f9f9f9',
   },
-  termText: { fontSize: 24, fontWeight: 'bold', textAlign: 'center' },
+  termText: { fontSize: 26, fontWeight: 'bold', textAlign: 'center', color: '#333' },
   buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     width: '100%',
     marginTop: 40,
+    paddingHorizontal: 10,
+    gap: 10
   },
   button: {
     paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 10,
+    borderRadius: 12,
     elevation: 3,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   buttonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-  hardButton: { backgroundColor: '#ff6b6b' },
-  normalButton: { backgroundColor: '#4dabf7' },
-  easyButton: { backgroundColor: '#69db7c' },
-  disabledButton: { opacity: 0.5 },
-  progressContainer: {
+  hardButton: { backgroundColor: '#FF5252' },
+  normalButton: { backgroundColor: '#2196F3' },
+  easyButton: { backgroundColor: '#4CAF50' },
+  disabledButton: { opacity: 0.3 },
+  
+  topInfoContainer: {
     position: 'absolute',
-    top: 60,
-    right: 20,
+    top: 20,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between', // İki uca yasla
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  progressContainer: {
     backgroundColor: '#fff',
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 20,
+    elevation: 2,
+    marginLeft: 'auto'
   },
   progressText: {
     color: '#333',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
   },
+  bonusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3E0', 
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
+  },
+  bonusText: {
+    color: '#FF9800', 
+    fontSize: 12,
+    fontWeight: 'bold',
+  }
 });

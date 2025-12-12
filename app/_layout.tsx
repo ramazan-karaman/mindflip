@@ -1,150 +1,119 @@
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { MenuProvider } from 'react-native-popup-menu';
 import 'react-native-reanimated';
-import 'react-native-url-polyfill/auto';
 
-import { Session } from '@supabase/supabase-js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import * as Linking from 'expo-linking';
-import { useOnlineManager } from '../hooks/useOnlineManager';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+// Sadece veritabanı başlatma importu kaldı.
+// Sync servisleri kaldırıldı.
 import { initializeDatabase } from '../lib/db';
-import { importDatabaseFromUrl } from '../lib/services/backupService';
-import { checkHasPendingChanges, ensureLocalUserExists, runFullSync } from '../lib/services/syncService';
-import { supabase } from '../lib/supabase';
-
-
-
 import Splash from './splash';
 
 export const unstable_settings = {
   anchor: '(drawer)',
 };
+
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [isReady, setIsReady] = useState(false);
-  const [session, setSession] = useState<Session | null>(null);
-  
-  const segments = useSegments();
-  const router = useRouter();
 
-  useOnlineManager();
-
-  // 1. Veritabanı ve Oturum Kontrolü
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // Sadece yerel veritabanını başlatıyoruz
         await initializeDatabase();
-        console.log("Database hazır.");
-        
-        // Mevcut oturumu al
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-
-        if (session) {
-            await ensureLocalUserExists();
-        }
-
+        console.log("Database (Offline) başarıyla başlatıldı.");
       } catch (error) {
-        console.error("Başlatma hatası:", error);
+        console.error("Database başlatılırken hata oluştu:", error);
+        // Hata olsa bile uygulamayı açmaya çalışalım (Splash'te takılmasın)
       } finally {
+        // UI render edilmeye hazır
         setIsReady(true);
       }
     };
 
     initializeApp();
-
-    // Oturum değişikliklerini dinle (Login/Logout anında tetiklenir)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async(_event, session) => {
-      setSession(session);
-      if (session) {
-        // Kullanıcı giriş yaptıysa senkronizasyonu başlat
-        await ensureLocalUserExists();
-        checkHasPendingChanges();
-        runFullSync();
-      }
-    });
-
-    return () => subscription.unsubscribe();
   }, []);
 
-  // 2. Yönlendirme Mantığı (Auth Guard)
-  useEffect(() => {
-    if (!isReady) return;
-
-    const inAuthGroup = segments[0] === 'login'; // Login ekranında mıyız?
-    
-    if (session && inAuthGroup) {
-      router.replace('/(drawer)');
-    } else if (!session && !inAuthGroup) {
-      router.replace('/login');
-    }
-  }, [session, segments, isReady]);
-
-  useEffect(() => {
-  const handleDeepLink = async (event: { url: string }) => {
-    const url = event.url;
-    // Dosya uzantısı kontrolü
-    if (url && (url.endsWith('.mindflip') || url.includes('mindflip'))) {
-       await importDatabaseFromUrl(url);
-    }
-  };
-
-  // Uygulama açıksa dinle
-  const subscription = Linking.addEventListener('url', handleDeepLink);
-
-  // Uygulama kapalıyken açıldıysa (Cold Start)
-  Linking.getInitialURL().then((url) => {
-    if (url) handleDeepLink({ url });
-  });
-
-  return () => subscription.remove();
-}, []);
-
+  // Veritabanı hazır olana kadar Splash ekranını göster
   if (!isReady) {
     return <Splash />;
   }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* Popup Menu (Deste seçenekleri için) Sağlayıcısı */}
       <MenuProvider>
+        {/* Tema (Dark/Light) Sağlayıcısı */}
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          {/* React Query (Veri Yönetimi) Sağlayıcısı */}
           <QueryClientProvider client={queryClient}>
+            
             <Stack
               screenOptions={{
                 headerStyle: {
                   backgroundColor: colorScheme === 'dark' ? '#1c1c1e' : '#ffffff',
                 },
                 headerTintColor: colorScheme === 'dark' ? '#ffffff' : '#000000',
-                headerTitleStyle: { fontWeight: 'bold' },
-                headerBackTitle: '',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+                headerBackTitle: '', // iOS'te geri butonunda yazı yazmasın
               }}
             >
-              {/* Giriş yapmış kullanıcılar için */}
+              {/* Ana Çekmece (Drawer) Navigasyonu */}
               <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
               
-              {/* Giriş ekranı (Header yok) */}
-              <Stack.Screen name="login" options={{ headerShown: false }} />
-
-              {/* Diğer Alt Sayfalar */}
-              <Stack.Screen name="addcard" options={{ presentation: 'modal', title: 'Yeni Kart Ekle' }} />
-              <Stack.Screen name="editDeck" options={{ presentation: 'modal', title: 'Desteyi Düzenle' }} />
-              <Stack.Screen name="practice" options={{ title: 'Pratik Seçenekleri' }} />
+              {/* Modal Ekranlar */}
+              <Stack.Screen
+                name="addcard"
+                options={{ presentation: 'modal', title: 'Yeni Kart Ekle' }}
+              />
+              <Stack.Screen
+                name="editDeck"
+                options={{ presentation: 'modal', title: 'Desteyi Düzenle' }}
+              />
               
-              {/* Oyun Modları */}
-              <Stack.Screen name="pratik/classic" options={{ title: 'Klasik Pratik' }} />
-              <Stack.Screen name="pratik/match" options={{ title: 'Eşleştirme', headerShown: false }} />
-              <Stack.Screen name="pratik/truefalse" options={{ title: 'Doğru / Yanlış', headerShown: false }} />
-              <Stack.Screen name="pratik/multiple" options={{ title: 'Çoktan Seçmeli' }} />
-              <Stack.Screen name="pratik/write" options={{ title: 'Yazma Pratiği' }} />
-
+              {/* Normal Ekranlar */}
+              <Stack.Screen
+                name="practice"
+                options={{ title: 'Pratik Seçenekleri' }}
+              />
+              
+              {/* Pratik Modları */}
+              <Stack.Screen
+                name="pratik/classic"
+                options={{ title: 'Klasik Pratik' }}
+              />
+              <Stack.Screen
+                name="pratik/match"
+                options={{ title: 'Eşleştirme', headerShown: false }} // Oyun ekranlarında header kapatılabilir
+              />
+              <Stack.Screen
+                name="pratik/truefalse"
+                options={{ title: 'Doğru / Yanlış', headerShown: false }}
+              />
+              <Stack.Screen
+                name="pratik/write"
+                options={{ title: 'Yazma Pratiği' }}
+              />
+              <Stack.Screen
+                name="pratik/multiple"
+                options={{ title: 'Çoktan Seçmeli' }}
+              />
+               <Stack.Screen
+                name="pratik/random"
+                options={{ title: 'Rastgele' }}
+              />
             </Stack>
+
             <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
           </QueryClientProvider>
         </ThemeProvider>

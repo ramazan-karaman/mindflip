@@ -62,7 +62,7 @@ const CardComponent = React.memo(({
         transform: [{ translateX: offset.value }]
     }));
 
-    // Stiller 
+    // Stiller
     const baseCardStyle = { ...styles.card, height: cardHeight };
     const baseTextStyle = styles.cardText;
 
@@ -531,3 +531,7 @@ const styles = StyleSheet.create({
     exitBtn: { backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', padding: 18, borderRadius: 16, borderWidth: 2, borderColor: '#eee' },
     exitBtnText: { color: '#666', fontSize: 16, fontWeight: 'bold' }
 });
+
+//MatchScreen içinde state yönetimi biraz karışık (allPairs, currentRoundItems vb.). Oyun mantığını useMatchGame gibi bir Custom Hook içine alırsan Screen dosyan sadece render işiyle uğraşır, çok daha temiz olur.
+
+//useWindowDimensions() gibi hooklarla boyutları dinamik alabilirsin. Böylece orientation değişimlerinde de uyumlu olur. kontrol edilecek

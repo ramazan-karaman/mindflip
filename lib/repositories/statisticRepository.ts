@@ -2,9 +2,10 @@ import { SQLiteRunResult } from 'expo-sqlite';
 import { db } from '../db';
 import { Statistic } from '../types';
 
+// Yeni istatistik kaydı oluşturma
+// Not: user_id kaldırıldı.
 export const createStatistic = async (
-  user_id: number, 
-  date: string, 
+  date: string, // ISOString
   studied_card_count: number, 
   added_card_count: number, 
   learned_card_count: number, 
@@ -13,19 +14,18 @@ export const createStatistic = async (
   deck_success_rate: number | null
 ): Promise<Statistic | null> => {
 
-  const now = new Date().toISOString();
+  // sync_status ve last_modified kaldırıldı
   const query = `
     INSERT INTO statistics (
-      user_id, date, studied_card_count, added_card_count, learned_card_count, 
-      spent_time, practice_success_rate, deck_success_rate,
-      last_modified, sync_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_create');
+      date, studied_card_count, added_card_count, learned_card_count, 
+      spent_time, practice_success_rate, deck_success_rate
+    ) VALUES (?, ?, ?, ?, ?, ?, ?);
   `;
   
   try {
     const result = await db.runAsync(query, [
-      user_id, date, studied_card_count, added_card_count, learned_card_count, 
-      spent_time, practice_success_rate, deck_success_rate, now
+      date, studied_card_count, added_card_count, learned_card_count, 
+      spent_time, practice_success_rate, deck_success_rate
     ]);
     
     console.log(`İstatistik kaydı oluşturuldu: ID ${result.lastInsertRowId}`);
@@ -37,8 +37,10 @@ export const createStatistic = async (
   }
 };
 
+// ID'ye göre tekil istatistik getirme
 export const getStatisticById = async (id: number): Promise<Statistic | null> => {
-  const query = `SELECT * FROM statistics WHERE id = ? AND sync_status != 'pending_delete';`;
+  // Sync filtresi kaldırıldı
+  const query = `SELECT * FROM statistics WHERE id = ?;`;
   try {
     const statistic = await db.getFirstAsync<Statistic>(query, [id]);
     return statistic ?? null;
@@ -48,21 +50,38 @@ export const getStatisticById = async (id: number): Promise<Statistic | null> =>
   }
 };
 
-export const getStatistics = async (user_id: number): Promise<Statistic[]> => {
+// Tüm istatistikleri getirme
+// Not: user_id kaldırıldı. Tarihe göre yeniden eskiye sıralar.
+export const getStatistics = async (): Promise<Statistic[]> => {
   const query = `
     SELECT * FROM statistics 
-    WHERE user_id = ? AND sync_status != 'pending_delete'
-    ORDER BY date ASC; -- Tarihe göre sıralı (Grafik çizimi için ideal)
+    ORDER BY date DESC;
   `;
   try {
-    const allRows = await db.getAllAsync<Statistic>(query, [user_id]);
+    const allRows = await db.getAllAsync<Statistic>(query);
     return allRows;
   } catch (error) {
-    console.error(`Kullanıcı ${user_id} için istatistikler alınırken hata:`, error);
+    console.error(`İstatistikler alınırken hata:`, error);
     throw error;
   }
 };
 
+// Belirli bir tarihe ait istatistiği getirme (Varsa güncellemek için kullanışlıdır)
+export const getStatisticByDate = async (date: string): Promise<Statistic | null> => {
+  // Tarih karşılaştırması için (String formatında tutulduğu varsayılıyor)
+  const query = `SELECT * FROM statistics WHERE date LIKE ?;`;
+  try {
+    // Tarihin sadece 'YYYY-MM-DD' kısmını eşleştirmek istersen LIKE kullanabilirsin
+    // veya tam eşleşme için '=' kullanabilirsin. Burada tam eşleşme varsayıldı.
+    const statistic = await db.getFirstAsync<Statistic>(query, [`${date}%`]); 
+    return statistic ?? null;
+  } catch (error) {
+    console.error(`Tarih bazlı istatistik alınırken hata:`, error);
+    throw error;
+  }
+};
+
+// İstatistik güncelleme
 export const updateStatistic = async (
   id: number, 
   studied_card_count: number, 
@@ -73,7 +92,7 @@ export const updateStatistic = async (
   deck_success_rate: number | null
 ): Promise<SQLiteRunResult> => {
   
-  const now = new Date().toISOString();
+  // Sync mantığı temizlendi
   const query = `
     UPDATE statistics SET 
       studied_card_count = ?, 
@@ -81,12 +100,7 @@ export const updateStatistic = async (
       learned_card_count = ?, 
       spent_time = ?, 
       practice_success_rate = ?, 
-      deck_success_rate = ?, 
-      last_modified = ?, 
-      sync_status = CASE 
-                      WHEN sync_status = 'pending_create' THEN 'pending_create' 
-                      ELSE 'pending_update' 
-                    END
+      deck_success_rate = ?
     WHERE id = ?;
   `;
   
@@ -94,7 +108,7 @@ export const updateStatistic = async (
     const result = await db.runAsync(query, [
       studied_card_count, added_card_count, learned_card_count, 
       spent_time, practice_success_rate, deck_success_rate, 
-      now, id
+      id
     ]);
     console.log(`İstatistik ${id} güncellendi.`);
     return result;
@@ -104,18 +118,14 @@ export const updateStatistic = async (
   }
 };
 
+// İstatistik silme (Hard Delete)
 export const deleteStatistic = async (id: number): Promise<SQLiteRunResult> => {
-  const now = new Date().toISOString();
-  const query = `
-    UPDATE statistics 
-    SET 
-      sync_status = 'pending_delete',
-      last_modified = ?
-    WHERE id = ?;
-  `;
+  // Soft delete yerine Hard delete
+  const query = `DELETE FROM statistics WHERE id = ?;`;
+  
   try {
-    const result = await db.runAsync(query, [now, id]);
-    console.log(`İstatistik ${id} silinmek üzere işaretlendi.`);
+    const result = await db.runAsync(query, [id]);
+    console.log(`İstatistik ${id} silindi.`);
     return result;
   } catch (error) {
     console.error(`İstatistik ${id} silinirken hata:`, error);

@@ -1,8 +1,9 @@
 import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
 
+// Web ortamında patlamaması için Mock yapı (Geliştirme süreci güvenliği için)
 function createWebDatabaseMock() {
-  console.log("Web platformunda database işlemleri mocklandı.");
+  console.log("Web platformunda database işlemleri mocklandı (Offline Mod).");
   return {
     execAsync: () => Promise.resolve(),
     getFirstAsync: <T>() => Promise.resolve(null as T | null),
@@ -16,8 +17,9 @@ function openDatabase() {
     return createWebDatabaseMock() as unknown as SQLite.SQLiteDatabase;
   }
   
+  // Veritabanı dosya ismini aynı tutuyoruz
   const db = SQLite.openDatabaseSync("mindflip.db");
-  console.log("Veritabanı açıldı veya oluşturuldu: mindflip.db");
+  console.log("Veritabanı bağlantısı başarılı: mindflip.db");
   return db;
 }
 
@@ -25,113 +27,73 @@ export const db = openDatabase();
 
 export const initializeDatabase = async () => {
   try {
+    // WAL Modu: Performans için (Yazma/Okuma çakışmasını azaltır)
     await db.execAsync(`PRAGMA journal_mode = WAL;`);
     
-  
+    // Foreign Key desteğini açıyoruz (Cascade silme işlemleri için kritik)
+    await db.execAsync(`PRAGMA foreign_keys = ON;`);
+    
     await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        cloud_id TEXT UNIQUE, 
-        name TEXT, 
-        email TEXT, 
-        profile_photo TEXT,
-        last_modified TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-        sync_status TEXT NOT NULL DEFAULT 'synced'
-      );
-    `);
-
-    await db.execAsync(`
+      -- DESTELER TABLOSU (Sadeleştirildi)
       CREATE TABLE IF NOT EXISTS decks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        cloud_id TEXT UNIQUE,
-        user_id INTEGER, 
-        name TEXT, 
+        name TEXT NOT NULL, 
         description TEXT, 
-        goal INTEGER, 
-        created_at TEXT, 
-        last_modified TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-        sync_status TEXT NOT NULL DEFAULT 'synced',
-        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        goal INTEGER DEFAULT 5, 
+        created_at TEXT DEFAULT (datetime('now'))
       );
-    `);
 
-    await db.execAsync(`
+      -- KARTLAR TABLOSU (SRS Verileri ve İçerik)
+      -- user_id, cloud_id, sync_status YOK.
+      -- interval, easeFactor, nextReview VAR (SRS Algoritması için)
       CREATE TABLE IF NOT EXISTS cards (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
-        cloud_id TEXT UNIQUE,
-        deck_id INTEGER, 
-        front_word TEXT, 
+        deck_id INTEGER NOT NULL, 
+        front_word TEXT NOT NULL, 
         front_image TEXT, 
-        back_word TEXT, 
+        back_word TEXT NOT NULL, 
         back_image TEXT, 
-        rating TEXT, 
-        created_at TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        
+        -- SRS (SuperMemo-2) Alanları
         interval REAL DEFAULT 1,
-        ease_factor REAL DEFAULT 2.5,  -- DÜZELTİLDİ (Eski: easeFactor)
-        next_review TEXT,              -- DÜZELTİLDİ (Eski: nextReview)
-        last_modified TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-        sync_status TEXT NOT NULL DEFAULT 'synced',
+        easeFactor REAL DEFAULT 2.5,
+        nextReview TEXT, 
+        
+        -- Deste silinirse kartlar da silinsin
         FOREIGN KEY(deck_id) REFERENCES decks(id) ON DELETE CASCADE
       );
-    `);
 
-    await db.execAsync(`
+      -- İSTATİSTİKLER TABLOSU
+      -- user_id kaldırıldı. Cihazdaki genel istatistikleri tutar.
       CREATE TABLE IF NOT EXISTS statistics (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
-        cloud_id TEXT UNIQUE,
-        user_id INTEGER, 
         date TEXT, 
-        studied_card_count INTEGER, 
-        added_card_count INTEGER, 
-        learned_card_count INTEGER, 
-        spent_time INTEGER, 
+        studied_card_count INTEGER DEFAULT 0, 
+        added_card_count INTEGER DEFAULT 0, 
+        learned_card_count INTEGER DEFAULT 0, 
+        spent_time INTEGER DEFAULT 0, 
         practice_success_rate REAL, 
-        deck_success_rate REAL, 
-        last_modified TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-        sync_status TEXT NOT NULL DEFAULT 'synced',
-        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        deck_success_rate REAL
       );
-    `);
 
-    await db.execAsync(`
+      -- PRATİK GEÇMİŞİ TABLOSU
+      -- Hangi desteye ne zaman çalışıldı?
       CREATE TABLE IF NOT EXISTS practices (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
-        cloud_id TEXT UNIQUE,
-        user_id INTEGER, 
         deck_id INTEGER, 
         date TEXT, 
         duration INTEGER, 
         success_rate REAL, 
-        last_modified TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-        sync_status TEXT NOT NULL DEFAULT 'synced',
-        FOREIGN KEY(user_id) REFERENCES users(id), 
+        
+        -- Deste silinirse ona ait geçmiş pratik kayıtları da silinsin
         FOREIGN KEY(deck_id) REFERENCES decks(id) ON DELETE CASCADE
       );
     `);
 
-    console.log("Database tabloları başarıyla kontrol edildi/oluşturuldu.");
+    console.log("Veritabanı tabloları (Offline-First) başarıyla kontrol edildi/oluşturuldu.");
   } catch (error) {
-    console.error("Database oluşturulurken hata:", error);
-    throw error;
-  }
-};
-
-// GÜVENLİK: Çıkış yapıldığında tüm yerel veriyi temizle
-export const clearDatabase = async () => {
-  try {
-    console.log("⚠️ Yerel veritabanı temizleniyor...");
-    await db.execAsync(`
-      DELETE FROM cards;
-      DELETE FROM decks;
-      DELETE FROM practices;
-      DELETE FROM statistics;
-      DELETE FROM users;
-    `); 
-    // Tabloları drop etmiyoruz (silmiyoruz), sadece içlerini boşaltıyoruz.
-    // Böylece yeni giren kullanıcı için tablolar hazır bekliyor.
-    console.log("✅ Yerel veritabanı sıfırlandı.");
-  } catch (error) {
-    console.error("Veritabanı temizleme hatası:", error);
+    console.error("Veritabanı başlatılırken kritik hata:", error);
     throw error;
   }
 };

@@ -6,8 +6,6 @@ import {
     ActivityIndicator,
     Alert,
     FlatList,
-    Image,
-    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -16,31 +14,33 @@ import {
 } from 'react-native';
 import * as CardRepository from '../lib/repositories/cardRepository';
 import * as DeckRepository from '../lib/repositories/deckRepository';
-import { checkHasPendingChanges } from '../lib/services/syncService';
 import { Card } from '../lib/types';
 
 export default function EditDeckScreen() {
-  const { deckId } = useLocalSearchParams<{ deckId: string }>();
+  const { deckId } = useLocalSearchParams();
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const id = deckId ? parseInt(deckId, 10) : NaN;
+  const id = deckId && typeof deckId === 'string' ? parseInt(deckId, 10) : NaN;
 
   const [deckName, setDeckName] = useState('');
   const [deckDescription, setDeckDescription] = useState('');
 
+  // Deste Bilgilerini Getir
   const { data: deck, isLoading: isLoadingDeck } = useQuery({
     queryKey: ['deck', id],
     queryFn: () => DeckRepository.getDeckById(id),
     enabled: !isNaN(id),
   });
 
+  // Kartları Getir
   const { data: cards, isLoading: isLoadingCards } = useQuery({
     queryKey: ['cards', id],
     queryFn: () => CardRepository.getCardByIdDeck(id),
     enabled: !isNaN(id),
   });
 
+  // Veri gelince state'i güncelle
   useEffect(() => {
     if (deck) {
       setDeckName(deck.name);
@@ -48,6 +48,7 @@ export default function EditDeckScreen() {
     }
   }, [deck]);
 
+  // Deste Güncelleme Mutation
   const { mutate: updateDeckMutate, isPending: isUpdatingDeck } = useMutation({
     mutationFn: (variables: { name: string; description: string }) => {
       if (!deck) throw new Error('Deste yüklenemedi.');
@@ -61,8 +62,7 @@ export default function EditDeckScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deck', id] });
       queryClient.invalidateQueries({ queryKey: ['decks'] });
-      checkHasPendingChanges();
-
+      
       Alert.alert('Başarılı', 'Deste bilgileri güncellendi.');
       router.back();
     },
@@ -72,12 +72,12 @@ export default function EditDeckScreen() {
     },
   });
 
+  // Kart Silme Mutation (Hard Delete)
   const { mutate: deleteCardMutate } = useMutation({
     mutationFn: (cardId: number) => CardRepository.deleteCard(cardId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cards', id] });
-      queryClient.invalidateQueries({ queryKey: ['decks'] });
-      checkHasPendingChanges();
+      queryClient.invalidateQueries({ queryKey: ['decks'] }); // Kart sayısı değiştiği için
     },
     onError: (error) => {
       console.error('Kart silinirken hata:', error);
@@ -86,8 +86,8 @@ export default function EditDeckScreen() {
   });
 
   const handleUpdateDeck = () => {
-    if (!deckName.trim()) {
-      Alert.alert('Hata', 'Deste adı boş olamaz.');
+    if (deckName.trim() === '') {
+      Alert.alert('Hata', 'Deste ismi boş olamaz.');
       return;
     }
     updateDeckMutate({ name: deckName, description: deckDescription });
@@ -96,7 +96,7 @@ export default function EditDeckScreen() {
   const handleDeleteCard = (cardId: number) => {
     Alert.alert(
       'Kartı Sil',
-      'Bu kartı silmek istediğinizden emin misiniz?',
+      'Bu kartı kalıcı olarak silmek istediğinizden emin misiniz?',
       [
         { text: 'İptal', style: 'cancel' },
         {
@@ -108,38 +108,36 @@ export default function EditDeckScreen() {
     );
   };
 
+  // --- RENDER BİLEŞENLERİ ---
+
   const renderCardItem = ({ item }: { item: Card }) => (
     <View style={styles.cardItem}>
-      {/* Resim Varsa Göster (thumbnail) */}
-      {(item.front_image || item.back_image) && (
-        <Image 
-          source={{ uri: item.front_image || item.back_image || undefined }} 
-          style={styles.cardThumbnail} 
-        />
-      )}
-      
       <View style={styles.cardTextContainer}>
         <Text style={styles.cardTextFront} numberOfLines={1}>{item.front_word}</Text>
         <Text style={styles.cardTextBack} numberOfLines={1}>{item.back_word}</Text>
       </View>
       
+      {/* Görsel varsa ikon göster */}
+      {(item.front_image || item.back_image) && (
+        <Ionicons
+          name="image"
+          size={20}
+          color="#ccc"
+          style={{ marginRight: 15 }}
+        />
+      )}
+      
       <TouchableOpacity onPress={() => handleDeleteCard(item.id)} style={styles.deleteBtn}>
-        <Ionicons name="trash-bin-outline" size={20} color="#ff4d4d" />
+        <Ionicons name="trash-bin-outline" size={24} color="#ff4d4d" />
       </TouchableOpacity>
     </View>
   );
 
-  if (isLoadingDeck || isLoadingCards) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2196F3" />
-      </View>
-    );
-  }
-
-  return (
-    <ScrollView style={styles.container}>
+  // FlatList Header (Form Alanları Buraya Taşındı)
+  const ListHeader = () => (
+    <View style={styles.headerContainer}>
       <View style={styles.deckInfoContainer}>
+        <Text style={styles.sectionTitle}>Deste Bilgileri</Text>
         <TextInput
           style={styles.input}
           placeholder="Deste Adı"
@@ -161,7 +159,7 @@ export default function EditDeckScreen() {
           {isUpdatingDeck ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text style={styles.saveButtonText}>Deste Bilgilerini Kaydet</Text>
+            <Text style={styles.saveButtonText}>Kaydet</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -169,12 +167,25 @@ export default function EditDeckScreen() {
       <Text style={styles.cardsHeader}>
         Kartlar ({cards ? cards.length : 0})
       </Text>
+    </View>
+  );
 
+  if (isLoadingDeck || isLoadingCards) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2196F3" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
       <FlatList
         data={cards ?? []}
         renderItem={renderCardItem}
         keyExtractor={(item) => item.id.toString()}
-        scrollEnabled={false}
+        ListHeaderComponent={ListHeader}
+        contentContainerStyle={{ paddingBottom: 40 }}
         ListEmptyComponent={() => (
           <View style={styles.emptyCardsContainer}>
             <Text style={styles.emptyCardsText}>
@@ -186,15 +197,24 @@ export default function EditDeckScreen() {
           </View>
         )}
       />
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#f7f7f7',
+    paddingHorizontal: 20, // Kenar boşlukları ana container'a
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f7f7f7',
+  },
+  headerContainer: {
+    paddingTop: 20,
   },
   deckInfoContainer: {
     backgroundColor: 'white',
@@ -202,6 +222,16 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 30,
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
   },
   input: {
     borderWidth: 1,
@@ -234,53 +264,49 @@ const styles = StyleSheet.create({
   cardsHeader: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 15,
     color: '#444',
   },
   cardItem: {
     backgroundColor: 'white',
     borderRadius: 10,
-    padding: 12,
+    padding: 15,
     marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     elevation: 1,
-  },
-  cardThumbnail: {
-    width: 40,
-    height: 40,
-    borderRadius: 6,
-    marginRight: 12,
-    backgroundColor: '#eee'
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
   cardTextContainer: {
     flex: 1,
+    marginRight: 10,
   },
   cardTextFront: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
+    marginBottom: 4,
     color: '#333',
   },
   cardTextBack: {
     fontSize: 14,
     color: '#666',
-    marginTop: 2,
   },
   deleteBtn: {
-    padding: 8
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f7f7f7',
+    padding: 5,
   },
   emptyCardsContainer: {
-    padding: 20,
+    padding: 30,
     alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 10,
     marginTop: 10,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: '#ccc',
   },
   emptyCardsText: {
     fontSize: 16,

@@ -5,38 +5,11 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mindflip",
+    "scheme": "project1",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.blackman47.project1",
-      "infoPlist": {
-        "CFBundleDocumentTypes": [
-          {
-            "CFBundleTypeName": "MindFlip Backup",
-            "LSHandlerRank": "Owner",
-            "LSItemContentTypes": [
-              "com.blackman47.mindflip.backup"
-            ]
-          }
-        ],
-        "UTExportedTypeDeclarations": [
-          {
-            "UTTypeConformsTo": [
-              "public.json"
-            ],
-            "UTTypeDescription": "MindFlip Backup Data",
-            "UTTypeIdentifier": "com.blackman47.mindflip.backup",
-            "UTTypeTagSpecification": {
-              "public.filename-extension": [
-                "mindflip"
-              ]
-            }
-          }
-        ],
-        "LSSupportsOpeningDocumentsInPlace": true
-      }
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
@@ -47,34 +20,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.blackman47.project1",
-      "permissions": [
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "INTERNET"
-      ],
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            {
-              "scheme": "file",
-              "mimeType": "*/*",
-              "pathPattern": ".*\\.mindflip"
-            },
-            {
-              "scheme": "content",
-              "mimeType": "*/*",
-              "pathPattern": ".*\\.mindflip"
-            }
-          ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
-        }
-      ]
+      "package": "com.blackman47.project1"
     },
     "web": {
       "output": "static",
@@ -94,19 +40,11 @@
           }
         }
       ],
-      "expo-sqlite",
-      "expo-file-system",
-      "expo-document-picker"
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": false
-    },
-    "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "18f8dd71-800d-43bd-88ba-8eef1fa5a41c"
-      }
+      "reactCompiler": true
     }
   }
 }

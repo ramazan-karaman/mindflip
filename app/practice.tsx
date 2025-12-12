@@ -13,7 +13,7 @@ import PracticeModeCard from "../components/practiceModeCard";
 import * as DeckRepository from '../lib/repositories/deckRepository';
 import { DeckWithCardCount, PracticeRoute } from '../lib/types';
 
-
+// Modlar sabit kalıyor
 const practiceModes = [
   { id: "1", title: "Klasik", route: "/pratik/classic" , color: "#2196F3", icon: "book" },
   { id: "2", title: "Eşleştirme", route: "/pratik/match" , color: "#FF9800", icon: "git-compare" },
@@ -21,13 +21,14 @@ const practiceModes = [
   { id: "4", title: "Yazma", route: "/pratik/write", color: "#9C27B0", icon: "text" },
   { id: "5", title: "Çoktan seçmeli", route: "/pratik/multiple", color: "#F44336", icon: "list" },
   { id: "6", title: "Rastgele ?", route: "/pratik/random", color: "#009688", icon: "shuffle" },
-]as const;
+] as const;
 
 export default function PracticeScreen() {
   const router = useRouter();
   const { deckId: initialDeckId } = useLocalSearchParams<{ deckId: string }>();
   const [activeDeckId, setActiveDeckId] = useState<number | null>(null);
 
+  // Desteleri Getir (Parametresiz)
   const {
     data: allDecks,
     isLoading: isLoadingDecks,
@@ -37,30 +38,31 @@ export default function PracticeScreen() {
     queryFn: DeckRepository.getDecks,
   });
 
+  // İlk açılışta veya parametre geldiğinde aktif desteyi seç
   useEffect(() => {
-
     if (activeDeckId || !allDecks || allDecks.length === 0) {
       return;
     }
 
     if (initialDeckId) {
-      setActiveDeckId(parseInt(initialDeckId, 10));
-    }else{
+      const id = parseInt(initialDeckId, 10);
+      if (!isNaN(id)) {
+          setActiveDeckId(id);
+      }
+    } else {
+      // Parametre yoksa ilk desteyi seç
       setActiveDeckId(allDecks[0].id);
     }
   }, [initialDeckId, allDecks, activeDeckId]);
 
   const getDeckName = () => {
-    if (isLoadingDecks) {
-      return 'Desteler Yükleniyor...';
-    }
-    if (isErrorDecks) {
-      return 'Hata: Yüklenemedi';
-    }
-    if (!activeDeckId) {
-      return 'Deste Seçin...';
-    }
-    const currentDeck = allDecks?.find((d) => d.id === activeDeckId);
+    if (isLoadingDecks) return 'Desteler Yükleniyor...';
+    if (isErrorDecks) return 'Hata: Yüklenemedi';
+    if (!allDecks || allDecks.length === 0) return 'Deste Yok';
+    
+    if (!activeDeckId) return 'Deste Seçin...';
+    
+    const currentDeck = allDecks.find((d) => d.id === activeDeckId);
     return currentDeck ? currentDeck.name : 'Deste Bulunamadı';
   };
 
@@ -81,7 +83,7 @@ export default function PracticeScreen() {
               {isLoadingDecks ? (
                 <ActivityIndicator size="small" color="#333" />
               ) : (
-              <Ionicons name="chevron-down" size={24} color="#333" />
+                <Ionicons name="chevron-down" size={24} color="#333" />
               )}
             </View>
           </MenuTrigger>
@@ -91,7 +93,7 @@ export default function PracticeScreen() {
                 key={deck.id}
                 onSelect={() => setActiveDeckId(deck.id)}
               >
-                <Text style={[styles.menuOptionText,deck.id === activeDeckId && styles.menuOptionTextActive,]}>
+                <Text style={[styles.menuOptionText, deck.id === activeDeckId && styles.menuOptionTextActive]}>
                   {deck.name} ({deck.cardCount})
                 </Text>
               </MenuOption>
@@ -107,9 +109,9 @@ export default function PracticeScreen() {
             title={mode.title}
             route={mode.route}
             color={mode.color}
-            icon={mode.icon}
+            icon={mode.icon as any} 
             onPress={handlePress}
-            disabled={!activeDeckId || isLoadingDecks}
+            disabled={!activeDeckId || isLoadingDecks || (allDecks?.length === 0)}
           />
         ))}
       </View>

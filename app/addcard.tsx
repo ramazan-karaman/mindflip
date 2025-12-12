@@ -1,24 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+// YENİ MİMARİ: File ve Paths sınıflarını import ediyoruz
+import { File, Paths } from 'expo-file-system';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Keyboard,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Keyboard,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as CardRepository from '../lib/repositories/cardRepository';
-import { compressImage, getFileInfo } from '../lib/services/imageService'; // Servisimizi kullanacağız
-import { checkHasPendingChanges } from '../lib/services/syncService';
 
 export default function AddCardScreen() {
   const { deckId } = useLocalSearchParams();
@@ -30,33 +30,7 @@ export default function AddCardScreen() {
   const [frontImage, setFrontImage] = useState<string | null>(null);
   const [backImage, setBackImage] = useState<string | null>(null);
   
-  // Resim işleme durumu için loading
-  const [isProcessingImage, setIsProcessingImage] = useState(false);
-  
   const backWordInputRef = useRef<TextInput>(null);
-
-  // Ortak Resim İşleme Fonksiyonu
-  const processSelectedImage = async (uri: string, setImage: (uri: string | null) => void) => {
-    try {
-      setIsProcessingImage(true);
-      
-      console.log("--- Resim İşleme Başladı ---");
-      await getFileInfo(uri); // Orijinal boyut
-
-      // Sıkıştırma Servisini Çağır
-      const compressedUri = await compressImage(uri);
-      
-      await getFileInfo(compressedUri); // Yeni boyut
-      console.log("--- Resim İşleme Bitti ---");
-
-      setImage(compressedUri);
-    } catch (error) {
-      console.error("Resim işlenirken hata:", error);
-      Alert.alert("Hata", "Resim işlenirken bir sorun oluştu.");
-    } finally {
-      setIsProcessingImage(false);
-    }
-  };
 
   const pickImage = async (setImage: (uri: string | null) => void) => {
     Alert.alert(
@@ -68,18 +42,17 @@ export default function AddCardScreen() {
           onPress: async () => {
             const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (permissionResult.granted === false) {
-              Alert.alert('İzin Gerekli', 'Resim seçebilmek için galeri izni vermeniz gerekiyor.');
+              Alert.alert('İzin Gerekli', 'Galeri izni vermeniz gerekiyor.');
               return;
             }
             const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images, // DÜZELTME: MediaType.Images (Expo sürümüne göre değişebilir, şimdilik böyle kalsın hata verirse düzeltiriz)
+              mediaTypes: ImagePicker.MediaTypeOptions.Images, // GÜNCELLENDİ: MediaTypeOptions yerine MediaType
               allowsEditing: true,
               aspect: [4, 3],
-              quality: 1, // Biz zaten kendi servisimizle sıkıştıracağız, buradan ham alalım
+              quality: 0.8,
             });
-            
             if (!result.canceled) {
-              await processSelectedImage(result.assets[0].uri, setImage);
+              setImage(result.assets[0].uri);
             }
           },
         },
@@ -88,54 +61,84 @@ export default function AddCardScreen() {
           onPress: async () => {
             const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
             if (permissionResult.granted === false) {
-              Alert.alert('İzin Gerekli', 'Fotoğraf çekebilmek için kamera izni vermeniz gerekiyor.');
+              Alert.alert('İzin Gerekli', 'Kamera izni vermeniz gerekiyor.');
               return;
             }
             const result = await ImagePicker.launchCameraAsync({
               allowsEditing: true,
               aspect: [4, 3],
-              quality: 1,
+              quality: 0.8,
             });
-            
             if (!result.canceled) {
-              await processSelectedImage(result.assets[0].uri, setImage);
+              setImage(result.assets[0].uri);
             }
           },
         },
-        {
-          text: 'İptal',
-          style: 'cancel',
-        },
+        { text: 'İptal', style: 'cancel' },
       ]
     );
   };
 
+  // --- GERÇEK ÇÖZÜM: Yeni File System API ---
+  const saveImagePermanently = async (uri: string | null): Promise<string | null> => {
+    if (!uri) return null;
+
+    try {
+      // 1. Dosya adını al
+      const filename = uri.split('/').pop();
+      if (!filename) return null;
+
+      // 2. Kaynak Dosya Nesnesini oluştur
+      const sourceFile = new File(uri);
+
+      // 3. Hedef Klasör Nesnesi (Paths.document bir Directory nesnesidir)
+      const destinationDir = Paths.document;
+
+      // 4. Kopyalama İşlemi
+      // HATA BURADAYDI: Eskiden buraya string veriyorduk. 
+      // Şimdi 'destinationDir' nesnesini veriyoruz. 
+      // Bu işlem dosyayı o klasörün içine, aynı isimle kopyalar.
+      await sourceFile.copy(destinationDir);
+
+      console.log('Resim yeni sisteme göre taşındı.');
+
+      // 5. Veritabanı için string yolunu oluşturup döndür
+      // Paths.document.uri klasörün yolunu verir, dosya adını sonuna ekleriz.
+      return `${destinationDir.uri}/${filename}`;
+
+    } catch (error) {
+      console.error('Resim işlenirken hata:', error);
+      // Hata durumunda (nadir) orijinal yolu döndürerek akışı bozma
+      return uri; 
+    }
+  };
+
   const { mutate: addCard, isPending } = useMutation({
-    mutationFn: (newCard: {
+    mutationFn: async (newCard: {
       deck_id: number;
       front_word: string;
       front_image: string | null;
       back_word: string;
       back_image: string | null;
     }) => {
+      
+      // Resimleri kalıcı yap
+      const permFrontImage = await saveImagePermanently(newCard.front_image);
+      const permBackImage = await saveImagePermanently(newCard.back_image);
+
       return CardRepository.createCard(
         newCard.deck_id,
         newCard.front_word,
-        newCard.front_image,
+        permFrontImage, 
         newCard.back_word,
-        newCard.back_image,
-        null
+        permBackImage
       );
     },
 
     onSuccess: (newlyCreatedCard) => {
-      console.log('Kart başarıyla eklendi (local):', newlyCreatedCard?.id);
+      console.log('Kart eklendi:', newlyCreatedCard?.id);
       queryClient.invalidateQueries({ queryKey: ['cards', deckId] });
       queryClient.invalidateQueries({ queryKey: ['decks'] });
-      checkHasPendingChanges();
-      
-      // Formu temizle ki kullanıcı seri ekleme yapabilsin (Router.back yerine opsiyonel)
-      // Ama tasarımda router.back() var, o yüzden geri dönüyoruz.
       router.back();
     },
     onError: (error) => {
@@ -150,7 +153,7 @@ export default function AddCardScreen() {
       return;
     }
     if (!deckId || typeof deckId !== 'string') {
-      Alert.alert('Hata', 'Deste ID bulunamadı.');
+      Alert.alert('Hata', 'Deste bulunamadı.');
       return;
     }
 
@@ -164,15 +167,7 @@ export default function AddCardScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      {/* Resim işlenirken kullanıcıyı bilgilendir */}
-      {isProcessingImage && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#fff" />
-          <Text style={styles.loadingText}>Resim Sıkıştırılıyor...</Text>
-        </View>
-      )}
-
+    <ScrollView style={styles.container}>
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Ön Yüz</Text>
         <View style={styles.textInputWrapper}>
@@ -185,19 +180,20 @@ export default function AddCardScreen() {
             returnKeyType="next"
             onSubmitEditing={() => backWordInputRef.current?.focus()}
           />
-          <TouchableOpacity onPress={() => pickImage(setFrontImage)} disabled={isProcessingImage}>
+          <TouchableOpacity onPress={() => pickImage(setFrontImage)}>
             <Ionicons name="image-outline" size={30} color="#4F8EF7" />
           </TouchableOpacity>
         </View>
 
         <View style={styles.imagePreviewContainer}>
+          {/* Image source uri kontrolü */}
           <Image
             source={
               frontImage
                 ? { uri: frontImage }
                 : require('../assets/images/mindfliplogo.png')
             }
-            style={styles.previewImage}
+            style={[styles.previewImage, !frontImage && { opacity: 0.1 }]}
             resizeMode="cover"
           />
           {frontImage && (
@@ -223,10 +219,11 @@ export default function AddCardScreen() {
             returnKeyType="done"
             onSubmitEditing={() => Keyboard.dismiss()}
           />
-          <TouchableOpacity onPress={() => pickImage(setBackImage)} disabled={isProcessingImage}>
+          <TouchableOpacity onPress={() => pickImage(setBackImage)}>
             <Ionicons name="image-outline" size={30} color="#4F8EF7" />
           </TouchableOpacity>
         </View>
+        
         <View style={styles.imagePreviewContainer}>
           <Image
             source={
@@ -234,7 +231,7 @@ export default function AddCardScreen() {
                 ? { uri: backImage }
                 : require('../assets/images/mindfliplogo.png')
             }
-            style={styles.previewImage}
+            style={[styles.previewImage, !backImage && { opacity: 0.1 }]}
             resizeMode="cover"
           />
           {backImage && (
@@ -249,9 +246,9 @@ export default function AddCardScreen() {
       </View>
 
       <TouchableOpacity
-        style={[styles.saveButton, (isPending || isProcessingImage) && styles.saveButtonDisabled]}
+        style={[styles.saveButton, isPending && styles.saveButtonDisabled]}
         onPress={handleSaveCard}
-        disabled={isPending || isProcessingImage}
+        disabled={isPending}
       >
         {isPending ? (
           <ActivityIndicator color="white" />
@@ -264,81 +261,15 @@ export default function AddCardScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f7f7f7',
-    padding: 20,
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 10
-  },
-  loadingText: {
-    color: '#fff',
-    marginTop: 10,
-    fontWeight: 'bold'
-  },
-  inputContainer: {
-    marginBottom: 25,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#555',
-    marginBottom: 8,
-  },
-  textInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    paddingHorizontal: 10,
-  },
-  input: {
-    flex: 1,
-    height: 50,
-    fontSize: 16,
-  },
-  previewImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 10,
-    marginTop: 10,
-    alignSelf: 'center',
-    backgroundColor: '#eee',
-  },
-  imagePreviewContainer: {
-    alignSelf: 'center',
-    position: 'relative',
-  },
-  removeImageButton: {
-    position: 'absolute',
-    top: 5,
-    right: -5,
-    backgroundColor: 'white',
-    borderRadius: 15,
-  },
-  saveButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 40,
-  },
-  saveButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  saveButtonDisabled: {
-    backgroundColor: '#A5D6A7',
-  },
+  container: { flex: 1, backgroundColor: '#f7f7f7', padding: 20 },
+  inputContainer: { marginBottom: 25 },
+  label: { fontSize: 16, fontWeight: '600', color: '#555', marginBottom: 8 },
+  textInputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 12, borderColor: '#ddd', borderWidth: 1, paddingHorizontal: 10 },
+  input: { flex: 1, height: 50, fontSize: 16 },
+  previewImage: { width: 100, height: 100, borderRadius: 10, marginTop: 10, alignSelf: 'center', backgroundColor: '#eee' },
+  imagePreviewContainer: { alignSelf: 'center', position: 'relative' },
+  removeImageButton: { position: 'absolute', top: 5, right: -5, backgroundColor: 'white', borderRadius: 15 },
+  saveButton: { backgroundColor: '#4CAF50', padding: 15, borderRadius: 12, alignItems: 'center', marginTop: 10, marginBottom: 40 },
+  saveButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+  saveButtonDisabled: { backgroundColor: '#A5D6A7' },
 });

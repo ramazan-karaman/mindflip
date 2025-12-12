@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
-import React, { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    Button,
+    RefreshControl,
+    ScrollView,
     StyleSheet,
     Text,
     View,
@@ -11,193 +12,230 @@ import {
 
 import * as PracticeRepository from '../../lib/repositories/practiceRepository';
 import * as StatisticRepository from '../../lib/repositories/statisticRepository';
-import * as UserRepository from '../../lib/repositories/userRepository'; // UserRepo eklendi
-import { runFullSync } from '../../lib/services/syncService';
-import { useSyncStore } from '../../lib/store/syncStore';
-import { supabase } from '../../lib/supabase'; // Supabase eklendi
 
 export default function StatsScreen() {
-  const [localUserId, setLocalUserId] = useState<number | null>(null);
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
 
-  // 1. Aktif Kullanıcıyı Bul
-  useEffect(() => {
-    const fetchLocalUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        // MVP: Şimdilik ilk kullanıcıyı alıyoruz. İleride auth.uid ile eşleşeni çekeceğiz.
-        const users = await UserRepository.getUsers();
-        if (users.length > 0) {
-          setLocalUserId(users[0].id);
-        }
-      }
-    };
-    fetchLocalUser();
-  }, []);
-
+  // İstatistikleri Getir (User ID yok)
   const {
     data: stats,
     isLoading: isLoadingStats,
     isError: isErrorStats,
   } = useQuery({
-    queryKey: ['statistics', localUserId],
-    queryFn: () => StatisticRepository.getStatistics(localUserId!),
-    enabled: !!localUserId, // ID yoksa sorgu yapma
+    queryKey: ['statistics'],
+    queryFn: StatisticRepository.getStatistics,
   });
 
+  // Pratik Geçmişini Getir (User ID yok)
   const {
     data: practices,
     isLoading: isLoadingPractices,
     isError: isErrorPractices,
   } = useQuery({
-    queryKey: ['practices', localUserId],
-    queryFn: () => PracticeRepository.getPractices(localUserId!),
-    enabled: !!localUserId,
+    queryKey: ['practices'],
+    queryFn: PracticeRepository.getAllPractices,
   });
 
+  // Pull-to-Refresh (Aşağı çekerek yenileme) mantığı
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['statistics'] }),
+      queryClient.invalidateQueries({ queryKey: ['practices'] }),
+    ]);
+    setRefreshing(false);
+  }, [queryClient]);
+
+  // Hesaplamalar
   const totalStudied =
-    stats?.reduce((sum, stat) => sum + stat.studied_card_count, 0) ?? 0;
+    stats?.reduce((sum, stat) => sum + (stat.studied_card_count || 0), 0) ?? 0;
   const totalAdded =
-    stats?.reduce((sum, stat) => sum + stat.added_card_count, 0) ?? 0;
+    stats?.reduce((sum, stat) => sum + (stat.added_card_count || 0), 0) ?? 0;
   
-  // Practice tipinde 'duration' snake_case değil, types.ts'te 'duration' olarak kalmıştı, 
-  // ama DB'de de 'duration' olduğu için sorun yok.
+  // Süre hesaplama (ms cinsinden olduğu varsayılıyor)
   const totalTimeSpentMs =
-    practices?.reduce((sum, p) => sum + p.duration, 0) ?? 0;
+    practices?.reduce((sum, p) => sum + (p.duration || 0), 0) ?? 0;
   const totalTimeMinutes = Math.floor(totalTimeSpentMs / 1000 / 60);
 
-  const isSyncing = useSyncStore((state) => state.isSyncing);
-  const hasPendingChanges = useSyncStore((state) => state.hasPendingChanges);
+  // Ortalama Başarı Oranı
+  const totalPracticeCount = practices?.length ?? 0;
+  const averageSuccessRate = totalPracticeCount > 0 
+    ? Math.round(practices!.reduce((sum, p) => sum + (p.success_rate || 0), 0) / totalPracticeCount)
+    : 0;
 
-  if (!localUserId || isLoadingStats || isLoadingPractices) {
+  if (isLoadingStats || isLoadingPractices) {
     return (
-      <View style={styles.container}>
+      <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#2196F3" />
-        <Text style={{ marginTop: 10, color: '#999' }}>
-          İstatistikler yükleniyor...
-        </Text>
+        <Text style={styles.loadingText}>İstatistikler hesaplanıyor...</Text>
       </View>
     );
   }
 
   if (isErrorStats || isErrorPractices) {
     return (
-      <View style={styles.container}>
-        <Ionicons name="alert-circle-outline" size={64} color="red" />
-        <Text style={styles.title}>İstatistikler yüklenemedi.</Text>
-      </View>
+      <ScrollView 
+        contentContainerStyle={styles.centerContainer}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        <Ionicons name="alert-circle-outline" size={64} color="#F44336" />
+        <Text style={styles.errorTitle}>Veriler yüklenemedi</Text>
+        <Text style={styles.errorText}>Tekrar denemek için ekranı aşağı çekin.</Text>
+      </ScrollView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>İstatistikler</Text>
+    <ScrollView 
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
+      <Text style={styles.headerTitle}>Genel Bakış</Text>
 
-      <View style={styles.statsContainer}>
+      <View style={styles.gridContainer}>
+        
+        {/* Çalışılan Kartlar */}
         <View style={styles.statBox}>
+          <View style={[styles.iconContainer, { backgroundColor: '#E3F2FD' }]}>
+            <Ionicons name="book-outline" size={24} color="#2196F3" />
+          </View>
           <Text style={styles.statValue}>{totalStudied}</Text>
-          <Text style={styles.statLabel}>Toplam Çalışılan Kart</Text>
+          <Text style={styles.statLabel}>Çalışılan Kart</Text>
         </View>
+
+        {/* Eklenen Kartlar */}
         <View style={styles.statBox}>
+           <View style={[styles.iconContainer, { backgroundColor: '#E8F5E9' }]}>
+            <Ionicons name="add-circle-outline" size={24} color="#4CAF50" />
+          </View>
           <Text style={styles.statValue}>{totalAdded}</Text>
-          <Text style={styles.statLabel}>Toplam Eklenen Kart</Text>
+          <Text style={styles.statLabel}>Eklenen Kart</Text>
         </View>
+
+        {/* Toplam Süre */}
         <View style={styles.statBox}>
-          <Text style={styles.statValue}>{totalTimeMinutes}</Text>
-          <Text style={styles.statLabel}>Toplam Harcanan Dakika</Text>
+           <View style={[styles.iconContainer, { backgroundColor: '#FFF3E0' }]}>
+            <Ionicons name="time-outline" size={24} color="#FF9800" />
+          </View>
+          <Text style={styles.statValue}>{totalTimeMinutes} dk</Text>
+          <Text style={styles.statLabel}>Toplam Süre</Text>
         </View>
+
+        {/* Başarı Oranı */}
+        <View style={styles.statBox}>
+           <View style={[styles.iconContainer, { backgroundColor: '#F3E5F5' }]}>
+            <Ionicons name="trophy-outline" size={24} color="#9C27B0" />
+          </View>
+          <Text style={styles.statValue}>%{averageSuccessRate}</Text>
+          <Text style={styles.statLabel}>Başarı Oranı</Text>
+        </View>
+
+      </View>
+      
+      <View style={styles.infoContainer}>
+        <Ionicons name="information-circle-outline" size={20} color="#999" />
+        <Text style={styles.infoText}>
+          İstatistikler cihazınızdaki yerel veritabanından alınmaktadır.
+        </Text>
       </View>
 
-      <View style={styles.syncContainer}>
-        <Button
-          title="Şimdi Eşitle"
-          onPress={() => runFullSync()}
-          disabled={isSyncing || !hasPendingChanges}
-        />
-
-        {/* Durum Göstergeleri */}
-        {isSyncing && (
-          <View style={styles.syncStatus}>
-            <ActivityIndicator size="small" />
-            <Text style={styles.syncText}>Eşitleniyor...</Text>
-          </View>
-        )}
-
-        {!isSyncing && !hasPendingChanges && (
-          <View style={styles.syncStatus}>
-            <Ionicons name="checkmark-circle" size={18} color="green" />
-            <Text style={[styles.syncText, { color: 'green' }]}>
-              Tüm verileriniz güncel.
-            </Text>
-          </View>
-        )}
-
-        {!isSyncing && hasPendingChanges && (
-          <View style={styles.syncStatus}>
-            <Ionicons name="cloud-upload-outline" size={18} color="orange" />
-            <Text style={[styles.syncText, { color: 'orange' }]}>
-              Eşitlenmeyi bekleyen değişiklikler var.
-            </Text>
-          </View>
-        )}
-      </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff',
+  },
+  contentContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  centerContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     padding: 20,
   },
-  title: {
+  headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 40,
+    marginBottom: 30,
+    alignSelf: 'flex-start',
   },
-  statsContainer: {
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     width: '100%',
-    alignItems: 'center',
+    gap: 15,
   },
   statBox: {
-    backgroundColor: '#f7f7f7',
-    borderRadius: 12,
+    backgroundColor: '#fff',
+    borderRadius: 16,
     padding: 20,
-    width: '90%',
+    width: '47%', // İki sütunlu yapı
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 5,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+  },
+  iconContainer: {
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 10,
   },
   statValue: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#2196F3',
+    color: '#333',
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 16,
-    color: '#555',
-    marginTop: 5,
-  },
-  syncContainer: {
-    position: 'absolute',
-    bottom: 40,
-    width: '90%',
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    alignItems: 'center',
-  },
-  syncStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 15,
-  },
-  syncText: {
-    marginLeft: 10,
     fontSize: 14,
-    color: '#777',
+    color: '#888',
+    textAlign: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#999',
+    fontSize: 16,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  infoContainer: {
+    flexDirection: 'row',
+    marginTop: 40,
+    padding: 15,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+    alignItems: 'center',
+    width: '100%',
+  },
+  infoText: {
+    color: '#999',
+    fontSize: 12,
+    marginLeft: 10,
+    flex: 1,
   },
 });

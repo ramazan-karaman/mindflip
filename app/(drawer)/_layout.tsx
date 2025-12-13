@@ -62,9 +62,6 @@ function CustomDrawerContent(props: any) {
             <Text style={[styles.profileName, profileNameStyles]}>
               MindFlip
             </Text>
-            <Text style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-              Offline Mod
-            </Text>
           </View>
         </View>
 
@@ -99,7 +96,7 @@ export default function DrawerLayout() {
         drawerActiveTintColor: '#2196F3',
         drawerInactiveTintColor: colorScheme === 'dark' ? '#999' : '#555',
         drawerLabelStyle: {
-          marginLeft: -10,
+          marginLeft: -5,
           fontSize: 16,
         },
         drawerStyle: {

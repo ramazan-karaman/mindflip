@@ -174,6 +174,7 @@ export default function AddCardScreen() {
           <TextInput
             style={styles.input}
             placeholder="Ön kelime veya cümle"
+            placeholderTextColor="#888"
             value={frontWord}
             onChangeText={setFrontWord}
             autoFocus={true}
@@ -214,6 +215,7 @@ export default function AddCardScreen() {
             ref={backWordInputRef}
             style={styles.input}
             placeholder="Arka kelime veya cümle"
+            placeholderTextColor="#888"
             value={backWord}
             onChangeText={setBackWord}
             returnKeyType="done"

@@ -281,11 +281,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     backfaceVisibility: 'hidden',
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.23,
-    shadowRadius: 2.62,
-    elevation: 4,
+    
   },
   cardBack: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   image: {

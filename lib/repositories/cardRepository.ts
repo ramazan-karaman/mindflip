@@ -205,6 +205,24 @@ export const deleteCard = async (id: number): Promise<SQLiteRunResult> => {
 
     const query = `DELETE FROM cards WHERE id = ?;`;
     const result = await db.runAsync(query, [id]);
+
+    if (cardToDelete) {
+      // A. O destede kaç kart kaldığını say
+      const countResult = await db.getFirstAsync<{ count: number }>(
+        'SELECT count(*) as count FROM cards WHERE deck_id = ?',
+        [cardToDelete.deck_id]
+      );
+      
+      const remainingCount = countResult?.count ?? 0;
+
+      // B. Eğer Hedef (Goal) > Kalan Kart (Remaining) ise, Hedefi düşür.
+      // Örneğin: Hedef 10, Kalan 9 oldu. Hedefi 9 yap.
+      await db.runAsync(
+        'UPDATE decks SET goal = ? WHERE id = ? AND goal > ?',
+        [remainingCount, cardToDelete.deck_id, remainingCount]
+      );
+    }
+    
     console.log(`Kart ${id} silindi.`);
     return result;
 

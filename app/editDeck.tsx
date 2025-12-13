@@ -3,18 +3,23 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
+import InputWithLimit from '../components/InputWithLimit';
 import * as CardRepository from '../lib/repositories/cardRepository';
 import * as DeckRepository from '../lib/repositories/deckRepository';
 import { Card } from '../lib/types';
+
+const LIMITS = {
+  DECK_NAME: 20,
+  DECK_DESC: 50,
+};
 
 export default function EditDeckScreen() {
   const { deckId } = useLocalSearchParams();
@@ -134,22 +139,24 @@ export default function EditDeckScreen() {
   );
 
   // FlatList Header (Form Alanları Buraya Taşındı)
-  const ListHeader = () => (
+  const headerContent =(
     <View style={styles.headerContainer}>
       <View style={styles.deckInfoContainer}>
         <Text style={styles.sectionTitle}>Deste Bilgileri</Text>
-        <TextInput
-          style={styles.input}
+        <InputWithLimit
+          limit={LIMITS.DECK_NAME}
           placeholder="Deste Adı"
           value={deckName}
           onChangeText={setDeckName}
+          style={styles.input}
         />
-        <TextInput
-          style={[styles.input, styles.descriptionInput]}
-          placeholder="Açıklama"
+        <InputWithLimit
+          limit={LIMITS.DECK_DESC}
+          placeholder="Açıklama (İsteğe bağlı)"
           value={deckDescription}
           onChangeText={setDeckDescription}
           multiline
+          style={styles.descriptionInput} // Özel stil (height vb.)
         />
         <TouchableOpacity
           style={[styles.saveButton, isUpdatingDeck && styles.saveButtonDisabled]}
@@ -184,8 +191,8 @@ export default function EditDeckScreen() {
         data={cards ?? []}
         renderItem={renderCardItem}
         keyExtractor={(item) => item.id.toString()}
-        ListHeaderComponent={ListHeader}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        ListHeaderComponent={headerContent}
+        contentContainerStyle={{ paddingBottom: 40, padding:4 }}
         ListEmptyComponent={() => (
           <View style={styles.emptyCardsContainer}>
             <Text style={styles.emptyCardsText}>
@@ -205,7 +212,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f7f7f7',
-    paddingHorizontal: 20, // Kenar boşlukları ana container'a
+    paddingHorizontal: 16, // Kenar boşlukları ana container'a
   },
   loadingContainer: {
     flex: 1,

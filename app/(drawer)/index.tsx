@@ -10,7 +10,9 @@ import {
   Alert,
   Dimensions,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -352,7 +354,7 @@ export default function IndexScreen() {
         </TouchableOpacity>
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-          <TextInput placeholder="Destelerinde Ara..." value={search} onChangeText={setSearch} style={styles.searchInput} />
+          <TextInput placeholder="Destelerinde Ara..." placeholderTextColor="#888" value={search} onChangeText={setSearch} style={styles.searchInput} />
           {search.length > 0 && (
             <TouchableOpacity onPress={() => setSearch('')}>
               <Ionicons name="close-circle" size={20} color="#ccc" />
@@ -362,6 +364,10 @@ export default function IndexScreen() {
       </View>
 
       <Modal visible={showImportModal} animationType="slide" transparent onRequestClose={() => setShowImportModal(false)}>
+      <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+        >
         <View style={styles.sheetOverlay}>
           <View style={styles.sheetContent}>
             <Text style={styles.modalTitle}>İçe Aktarma Önizlemesi</Text>
@@ -389,6 +395,7 @@ export default function IndexScreen() {
             </TouchableOpacity>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={isGoalModalVisible} animationType="slide" transparent onRequestClose={() => setIsGoalModalVisible(false)}>
@@ -410,11 +417,15 @@ export default function IndexScreen() {
       </Modal>
 
       <Modal visible={showSheet} animationType="slide" transparent onRequestClose={() => setShowSheet(false)}>
+        <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+        >
         <View style={styles.sheetOverlay}>
             <View style={styles.sheetContent}>
                 <Text style={styles.modalTitle}>Yeni Deste Oluştur</Text>
-                <TextInput placeholder="İsim" value={newDeck.name} onChangeText={(t) => setNewDeck({ ...newDeck, name: t })} style={styles.input} />
-                <TextInput placeholder="Açıklama" value={newDeck.description} onChangeText={(t) => setNewDeck({ ...newDeck, description: t })} style={styles.input} />
+                <TextInput placeholder="İsim" placeholderTextColor="#888" value={newDeck.name} onChangeText={(t) => setNewDeck({ ...newDeck, name: t })} style={styles.input} />
+                <TextInput placeholder="Açıklama" placeholderTextColor="#888" value={newDeck.description} onChangeText={(t) => setNewDeck({ ...newDeck, description: t })} style={styles.input} />
                 <TouchableOpacity style={styles.saveBtn} onPress={() => { if(newDeck.name) addDeckMutate(newDeck); }} disabled={isAddingDeck}>
                     {isAddingDeck ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>Oluştur</Text>}
                 </TouchableOpacity>
@@ -423,13 +434,14 @@ export default function IndexScreen() {
                 </TouchableOpacity>
             </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <FlatList
         data={filteredDecks}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderDeck}
-        contentContainerStyle={{ paddingBottom: 100, padding: 4 }}
+        contentContainerStyle={{ paddingBottom: 160, padding: 4 }}
         ListEmptyComponent={() =>
           isLoadingDecks ? <ActivityIndicator size="large" color="#ccc" style={{marginTop: 50}} /> :
           <View style={styles.emptyContainer}>

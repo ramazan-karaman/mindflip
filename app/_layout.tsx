@@ -94,11 +94,11 @@ export default function RootLayout() {
               />
               <Stack.Screen
                 name="pratik/match"
-                options={{ title: 'Eşleştirme', headerShown: false }} // Oyun ekranlarında header kapatılabilir
+                options={{ title: 'Eşleştirme'}} // Oyun ekranlarında header kapatılabilir
               />
               <Stack.Screen
                 name="pratik/truefalse"
-                options={{ title: 'Doğru / Yanlış', headerShown: false }}
+                options={{ title: 'Doğru / Yanlış'}}
               />
               <Stack.Screen
                 name="pratik/write"

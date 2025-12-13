@@ -1,15 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring
+  Easing, // YENİ: Yumuşak geçiş eğrisi için
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming, // YENİ: Sallanmayı önlemek için Spring yerine Timing
 } from 'react-native-reanimated';
 
 interface ExpandableFabProps {
@@ -25,7 +26,14 @@ export default function ExpandableFab({ onCreateDeck, onImportCsv }: ExpandableF
 
   const toggleMenu = () => {
     const nextValue = isOpen ? 0 : 1;
-    animation.value = withSpring(nextValue, { damping: 12 });
+    
+    // DEĞİŞİKLİK BURADA:
+    // withSpring (sallanan yay) yerine withTiming (net geçiş) kullanıyoruz.
+    animation.value = withTiming(nextValue, {
+      duration: 250, // 250 milisaniyede tamamla
+      easing: Easing.out(Easing.quad), // Sona doğru yavaşça dur
+    });
+    
     setIsOpen(!isOpen);
   };
 
@@ -40,10 +48,10 @@ export default function ExpandableFab({ onCreateDeck, onImportCsv }: ExpandableF
   const importButtonStyle = useAnimatedStyle(() => {
     return {
       transform: [
-        { scale: animation.value },
-        { translateY: animation.value * -130 }, // Daha yukarı
+        { scale: animation.value }, // Büyüyerek gel
+        { translateY: animation.value * -130 }, // Yukarı kay
       ],
-      opacity: animation.value,
+      opacity: animation.value, // Görünür ol
     };
   });
 
@@ -52,26 +60,14 @@ export default function ExpandableFab({ onCreateDeck, onImportCsv }: ExpandableF
     return {
       transform: [
         { scale: animation.value },
-        { translateY: animation.value * -70 }, // Hemen üstü
+        { translateY: animation.value * -70 },
       ],
       opacity: animation.value,
     };
   });
 
-  // Arkaplanı karartma (Opsiyonel ama UX için iyi)
-  const overlayStyle = useAnimatedStyle(() => {
-    return {
-      opacity: animation.value * 0.5,
-      zIndex: animation.value > 0 ? 1 : -1,
-      pointerEvents: isOpen ? 'auto' : 'none',
-    } as any;
-  });
-
   return (
     <View style={styles.container}>
-      {/* Arkaplan Overlay (Menü açılınca arkası flulaşsın istersen) */}
-      {/* <Animated.View style={[styles.overlay, overlayStyle]} onTouchEnd={toggleMenu} /> */}
-
       {/* --- CSV IMPORT BUTONU --- */}
       <Animated.View style={[styles.actionBtnContainer, importButtonStyle]}>
         <View style={styles.labelContainer}>
@@ -112,14 +108,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 999,
   },
-  overlay: {
-    position: 'absolute',
-    bottom: -30, // Container offsetini geri al
-    right: -30,
-    width: 1000, // Ekranı kaplaması için büyük değer
-    height: 1000,
-    backgroundColor: 'black',
-  },
   mainBtn: {
     width: 60,
     height: 60,
@@ -140,8 +128,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    right: 5, // Hizalama
-    width: 200, // Yazı sığsın diye geniş
+    right: 5,
+    width: 200,
   },
   subBtn: {
     width: 44,

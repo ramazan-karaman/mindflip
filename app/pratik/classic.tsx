@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -28,6 +28,7 @@ import * as DeckRepository from '../../lib/repositories/deckRepository';
 import { Card } from '../../lib/types';
 
 // YENİ: Servisi import et
+import { savePracticeSession } from '../../lib/services/practiceService';
 import { calculateNextReview } from '../../lib/services/srsService';
 
 // --- (ESKİ calculateSRS FONKSİYONUNU SİL) ---
@@ -42,6 +43,16 @@ export default function ClassicScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const rotate = useSharedValue(0);
+
+  const startTimeRef = useRef<number>(Date.now());
+  const correctCountRef = useRef<number>(0);
+  const wrongCountRef = useRef<number>(0);
+
+  useEffect(() => {
+    startTimeRef.current = Date.now();
+    correctCountRef.current = 0;
+    wrongCountRef.current = 0;
+  }, []);
 
   // --- AKILLI ÇALIŞMA KUYRUĞU (Smart Bucket) ---
   const {
@@ -65,7 +76,7 @@ export default function ClassicScreen() {
       return queue.sort(() => Math.random() - 0.5);
     },
     enabled: !isNaN(id),
-  });
+  }); 
 
   const { mutate: updateCardSRSMutate } = useMutation({
     mutationFn: (variables: {
@@ -73,12 +84,14 @@ export default function ClassicScreen() {
       interval: number;
       easeFactor: number;
       nextReview: string;
+      box: number;
     }) =>
       CardRepository.updateCardSRS(
         variables.cardId,
         variables.interval,
         variables.easeFactor,
-        variables.nextReview
+        variables.nextReview,
+        variables.box
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cards', id] });
@@ -109,9 +122,13 @@ export default function ClassicScreen() {
     if (!currentCard) return;
 
     if (quality >= 3) {
+      // Normal(3) ve Kolay(5) -> Doğru kabul edilir
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      correctCountRef.current += 1; 
     } else {
+      // Zor(1) veya Unuttum -> Yanlış kabul edilir
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      wrongCountRef.current += 1;
     }
 
     // YENİ: Servis üzerinden hesaplama yapılıyor
@@ -125,6 +142,7 @@ export default function ClassicScreen() {
       interval,
       easeFactor,
       nextReview,
+      box: quality === 5 ? Math.min(currentCard.box + 1, 5) : (quality === 3 ? currentCard.box : Math.max(currentCard.box - 1, 0))
     });
 
     if (currentIndex < (practiceQueue?.length ?? 0) - 1) {
@@ -132,12 +150,29 @@ export default function ClassicScreen() {
       setIsFlipped(false);
       rotate.value = 0;
     } else {
-      Alert.alert(
-        'Tebrikler!',
-        'Bu oturumu başarıyla tamamladın.',
-        [{ text: 'Çıkış', onPress: () => navigation.goBack() }]
-      );
+      finishSession();
     }
+  };
+
+  const finishSession = async () => {
+    const endTime = Date.now();
+    const duration = endTime - startTimeRef.current; // Geçen süre (ms)
+
+    // 1. Servisi çağır (Arka planda kaydeder)
+    savePracticeSession({
+      deckId: id,
+      correctCount: correctCountRef.current,
+      wrongCount: wrongCountRef.current,
+      durationMs: duration,
+      mode: 'classic' // <--- Modu özellikle belirtiyoruz
+    });
+
+    // 2. Kullanıcıya bilgi ver
+    Alert.alert(
+      'Tebrikler!',
+      `Oturum tamamlandı.\n\nDoğru: ${correctCountRef.current}\nTekrar: ${wrongCountRef.current}`,
+      [{ text: 'Çıkış', onPress: () => navigation.goBack() }]
+    );
   };
 
   // Kartın Bonus olup olmadığını kontrol et

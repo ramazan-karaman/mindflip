@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
     runOnJS,
@@ -10,6 +10,7 @@ import Animated, {
     withTiming
 } from 'react-native-reanimated';
 import * as CardRepository from '../../lib/repositories/cardRepository';
+import { savePracticeSession } from '../../lib/services/practiceService';
 import { Card } from '../../lib/types';
 
 const { width } = Dimensions.get('window');
@@ -42,6 +43,10 @@ export default function MultipleChoiceScreen() {
     const [totalInitialCards, setTotalInitialCards] = useState(0);
     const [mistakeSet, setMistakeSet] = useState<Set<number>>(new Set());
 
+    const startTimeRef = useRef<number>(Date.now());
+    const correctCountRef = useRef<number>(0);
+    const wrongCountRef = useRef<number>(0);
+
     // --- ANİMASYON ---
     // Kartın sağa/sola kayması için değer
     const contentTranslateX = useSharedValue(0);
@@ -51,8 +56,27 @@ export default function MultipleChoiceScreen() {
         loadGameData();
     }, [deckId]);
 
+    useEffect(() => {
+        if (gameOver && deckId) {
+            const endTime = Date.now();
+            const duration = endTime - startTimeRef.current;
+            
+            // Servisi çağır (Arka plan işlemi)
+            savePracticeSession({
+                deckId: parseInt(deckId),
+                correctCount: correctCountRef.current,
+                wrongCount: wrongCountRef.current,
+                durationMs: duration,
+                mode: 'multiple' // <--- Modu belirtiyoruz
+            });
+        }
+    }, [gameOver]);
+
     const loadGameData = async () => {
         if (!deckId) return;
+        startTimeRef.current = Date.now();
+        correctCountRef.current = 0;
+        wrongCountRef.current = 0;
         try {
             const cards = await CardRepository.getCardByIdDeck(parseInt(deckId));
 
@@ -111,6 +135,7 @@ export default function MultipleChoiceScreen() {
 
         if (isCorrect) {
             // DOĞRU CEVAP: Titreşim YOK
+            correctCountRef.current += 1;
             if (!currentCard.isRetry) {
                 const newStreak = currentStreak + 1;
                 setCurrentStreak(newStreak);
@@ -122,6 +147,7 @@ export default function MultipleChoiceScreen() {
         } else {
             // YANLIŞ CEVAP: Titreşim VAR
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            wrongCountRef.current += 1;
             setCurrentStreak(0);
             setMistakeSet(prev => new Set(prev).add(currentCard.id));
 

@@ -1,26 +1,27 @@
 import { SQLiteRunResult } from 'expo-sqlite';
 import { db } from '../db';
-import { Practice } from '../types';
+import { Practice, PracticeMode } from '../types';
 
 // Yeni pratik kaydı oluşturma
-// Not: user_id kaldırıldı.
 export const createPractice = async (
   deck_id: number, 
   date: string, 
   duration: number, 
-  success_rate: number | null
+  correct_count: number,
+  wrong_count: number,
+  mode: PracticeMode = "classic" // Varsayılan mod: classic
 ): Promise<Practice | null> => {
 
-  // sync_status ve last_modified kaldırıldı.
+  // DÜZELTME: SQL sorgusuna 'mode' sütunu eklendi
   const query = `
-    INSERT INTO practices (deck_id, date, duration, success_rate) 
-    VALUES (?, ?, ?, ?);
+    INSERT INTO practices (deck_id, date, duration, correct_count, wrong_count,mode) 
+    VALUES (?, ?, ?, ?, ?, ?);
   `;
   
   try {
-    const result = await db.runAsync(query, [deck_id, date, duration, success_rate]);
+    const result = await db.runAsync(query, [deck_id, date, duration, correct_count, wrong_count,mode]);
     
-    console.log(`Pratik kaydı oluşturuldu (Local): ID ${result.lastInsertRowId}`);
+    console.log(`Pratik kaydı oluşturuldu (${mode}): ID ${result.lastInsertRowId}`);
     return getPracticeById(result.lastInsertRowId);
 
   } catch (error) {
@@ -31,7 +32,6 @@ export const createPractice = async (
 
 // ID'ye göre tekil pratik kaydı getirme
 export const getPracticeById = async (id: number): Promise<Practice | null> => {
-  // Sync filtresi kaldırıldı
   const query = `SELECT * FROM practices WHERE id = ?;`;
   
   try {
@@ -44,7 +44,6 @@ export const getPracticeById = async (id: number): Promise<Practice | null> => {
 };
 
 // Tüm pratik geçmişini getirme (Genel Tarihçe)
-// Not: user_id parametresi kaldırıldı. En yeniden eskiye sıralar.
 export const getAllPractices = async (): Promise<Practice[]> => {
   const query = `
     SELECT * FROM practices 
@@ -77,23 +76,24 @@ export const getPracticesByDeckId = async (deck_id: number): Promise<Practice[]>
   }
 };
 
-// Pratik kaydı güncelleme
+// Pratik kaydı güncelleme (Mod genellikle güncellenmez, o yüzden eklemedik)
 export const updatePractice = async (
   id: number, 
   duration: number, 
-  success_rate: number | null
+  correct_count: number,
+  wrong_count: number
 ): Promise<SQLiteRunResult> => {
   
-  // Sync ve tarihçe mantığı temizlendi
   const query = `
     UPDATE practices SET 
       duration = ?, 
-      success_rate = ?
+      correct_count = ?,
+      wrong_count = ?
     WHERE id = ?;
   `;
   
   try {
-    const result = await db.runAsync(query, [duration, success_rate, id]);
+    const result = await db.runAsync(query, [duration, correct_count, wrong_count, id]);
     console.log(`Pratik kaydı ${id} güncellendi.`);
     return result;
   } catch (error) {

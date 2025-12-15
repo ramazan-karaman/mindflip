@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -13,6 +13,7 @@ import Animated, {
     withTiming
 } from 'react-native-reanimated';
 import * as CardRepository from '../../lib/repositories/cardRepository';
+import { savePracticeSession } from '../../lib/services/practiceService';
 import { Card } from '../../lib/types';
 
 const { width, height } = Dimensions.get('window');
@@ -43,6 +44,10 @@ export default function TrueFalseScreen() {
     const [totalInitialCards, setTotalInitialCards] = useState(0);
     const [mistakeSet, setMistakeSet] = useState<Set<number>>(new Set());
 
+    const startTimeRef = useRef<number>(Date.now());
+    const correctSwipesRef = useRef<number>(0);
+    const wrongSwipesRef = useRef<number>(0);
+
     // --- ANİMASYON ---
     const translateX = useSharedValue(0);
     const rotate = useSharedValue(0);
@@ -51,8 +56,27 @@ export default function TrueFalseScreen() {
         loadGameData();
     }, [deckId]);
 
+    useEffect(() => {
+        if (gameOver && deckId) {
+            const endTime = Date.now();
+            const duration = endTime - startTimeRef.current;
+            
+            // Servisi çağır (Arka plan işlemi)
+            savePracticeSession({
+                deckId: parseInt(deckId),
+                correctCount: correctSwipesRef.current,
+                wrongCount: wrongSwipesRef.current,
+                durationMs: duration,
+                mode: 'truefalse' // <--- Modu belirtiyoruz
+            });
+        }
+    }, [gameOver]);
+
     const loadGameData = async () => {
         if (!deckId) return;
+        startTimeRef.current = Date.now();
+        correctSwipesRef.current = 0;
+        wrongSwipesRef.current = 0;
         try {
             const cards = await CardRepository.getCardByIdDeck(parseInt(deckId));
             if (cards.length < 4) {
@@ -106,6 +130,7 @@ export default function TrueFalseScreen() {
 
         if (isCorrect) {
             // DOĞRU: Titreşim YOK
+            correctSwipesRef.current += 1;
 
             if (!currentCard.isRetry) {
                 const newStreak = currentStreak + 1;
@@ -124,6 +149,7 @@ export default function TrueFalseScreen() {
 
         } else {
             // YANLIŞ: Titreşim VAR
+            wrongSwipesRef.current += 1;
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
             setCurrentStreak(0); // Sıfırla ama UI'da 0 olarak kalsın, kaybolmasın

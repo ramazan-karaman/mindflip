@@ -89,8 +89,8 @@ export const createCard = async (
   const query = `
     INSERT INTO cards (
       deck_id, front_word, front_image, back_word, back_image, 
-      created_at, nextReview
-    ) VALUES (?, ?, ?, ?, ?, ?, ?);
+      created_at, nextReview, box, interval, easeFactor
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 2.5);
   `;
   
   try {
@@ -174,18 +174,20 @@ export const updateCardSRS = async (
   id: number,
   interval: number,
   easeFactor: number,
-  nextReview: string
+  nextReview: string,
+  box: number
 ): Promise<SQLiteRunResult> => {
   const query = `
     UPDATE cards SET
     interval = ?,
     easeFactor = ?,
-    nextReview = ?
+    nextReview = ?,
+    box = ?
     WHERE id = ?;
   `;
 
   try {
-    const result = await db.runAsync(query, [interval, easeFactor, nextReview, id]);
+    const result = await db.runAsync(query, [interval, easeFactor, nextReview,box, id]);
     return result;
   } catch (error) {
     console.error(`SRS güncelleme hatası:`, error);
@@ -259,8 +261,8 @@ export const createCardsBatch = async (
           `INSERT INTO cards (
             deck_id, front_word, back_word, 
             created_at, nextReview, 
-            interval, easeFactor
-           ) VALUES (?, ?, ?, ?, ?, 1, 2.5);`, // Varsayılan SRS değerleri
+            interval, easeFactor,box
+           ) VALUES (?, ?, ?, ?, ?, 0, 2.5,0);`, // Varsayılan SRS değerleri
           [deck_id, card.front, card.back, now, now]
         );
       }
@@ -271,3 +273,14 @@ export const createCardsBatch = async (
     throw error;
   }
 };
+
+export const getTotalDueCardCount = async (): Promise<number> => {
+  const now = new Date().toISOString();
+  const query = `SELECT COUNT(*) as count FROM cards WHERE nextReview <= ? OR nextReview IS NULL`;
+  try {
+    const result = await db.getFirstAsync<{count: number}>(query, [now]);
+    return result?.count ?? 0;
+  } catch (error) {
+    return 0;
+  }
+}

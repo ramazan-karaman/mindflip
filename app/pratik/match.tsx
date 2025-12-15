@@ -14,6 +14,7 @@ import Animated, {
     ZoomIn
 } from 'react-native-reanimated';
 import * as CardRepository from '../../lib/repositories/cardRepository';
+import { savePracticeSession } from '../../lib/services/practiceService';
 import { Card } from '../../lib/types';
 
 const { width, height } = Dimensions.get('window');
@@ -136,6 +137,10 @@ export default function MatchScreen() {
     const [currentStreak, setCurrentStreak] = useState(0);
     const [maxStreak, setMaxStreak] = useState(0);
     const [mistakeCount, setMistakeCount] = useState(0);
+
+    const startTimeRef = useRef<number>(Date.now());
+    const correctMatchesRef = useRef<number>(0);
+    const wrongAttemptsRef = useRef<number>(0);
     
     // --- TIMER ---
     const [timeLeft, setTimeLeft] = useState(0);
@@ -146,6 +151,21 @@ export default function MatchScreen() {
         loadGameData();
         return () => stopTimer();
     }, [deckId]);
+
+    useEffect(() => {
+        if (gameOver && deckId) {
+            const endTime = Date.now();
+            const duration = endTime - startTimeRef.current;
+            
+            savePracticeSession({
+                deckId: parseInt(deckId),
+                correctCount: correctMatchesRef.current,
+                wrongCount: wrongAttemptsRef.current,
+                durationMs: duration,
+                mode: 'match' // <--- Mod: Eşleştirme
+            });
+        }
+    }, [gameOver]);
 
     useEffect(() => {
         if (!loading && !gameOver && !showEndModal && timeLeft > 0) {
@@ -182,6 +202,9 @@ export default function MatchScreen() {
 
     const loadGameData = async () => {
         if (!deckId) return;
+        startTimeRef.current = Date.now();
+        correctMatchesRef.current = 0;
+        wrongAttemptsRef.current = 0;
         try {
             const cards = await CardRepository.getCardByIdDeck(parseInt(deckId));
             if (cards.length < 4) {
@@ -242,6 +265,7 @@ export default function MatchScreen() {
 
             if (isMatch) {
                 // ✅ DOĞRU
+                correctMatchesRef.current += 1;
                 setCurrentStreak(prev => {
                     const newStreak = prev + 1;
                     setMaxStreak(ms => Math.max(ms, newStreak));
@@ -269,6 +293,7 @@ export default function MatchScreen() {
 
             } else {
                 // ❌ YANLIŞ
+                wrongAttemptsRef.current += 1;
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                 setCurrentStreak(0);
                 setMistakeCount(m => m + 1);

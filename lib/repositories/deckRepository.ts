@@ -12,7 +12,6 @@ const deleteImageFile = async (uri: string | null) => {
     const file = new File(uri);
     if (file.exists) {
         await file.delete();
-        // Log kirliliği olmaması için buradaki logu kaldırabilir veya azaltabilirsin
     }
   } catch (error) {
     console.warn(`Dosya silinemedi: ${uri}`, error);
@@ -24,7 +23,7 @@ const deleteImageFile = async (uri: string | null) => {
 export const createDeck = async (
   name: string,
   description: string | null,
-  goal: number | null
+  goal: number = 5
 ): Promise<Deck | null> => {
   const now = new Date().toISOString();
   
@@ -45,7 +44,9 @@ export const createDeck = async (
 
 export const getDecks = async (): Promise<DeckWithCardCount[]> => {
   const query = `
-    SELECT d.*, (SELECT COUNT(c.id) FROM cards c WHERE c.deck_id = d.id) as cardCount 
+    SELECT d.*, 
+    (SELECT COUNT(c.id) FROM cards c WHERE c.deck_id = d.id) as cardCount, 
+    (SELECT COUNT(c.id) FROM cards c WHERE c.deck_id = d.id AND (c.nextReview <= datetime('now') OR c.nextReview IS NULL)) as dueCount
     FROM decks d 
     ORDER BY d.name ASC;
   `;
@@ -93,6 +94,17 @@ export const updateDeck = async (
   } catch (error) {
     console.error(`Deste güncelleme hatası:`, error);
     throw error;
+  }
+};
+
+export const getTotalDeckGoal = async (): Promise<number> => {
+  // Eğer goal null ise varsayılan 5 kabul et
+  const query = `SELECT SUM(COALESCE(goal, 5)) as totalGoal FROM decks`;
+  try {
+    const result = await db.getFirstAsync<{totalGoal: number}>(query);
+    return result?.totalGoal ?? 0;
+  } catch (error) {
+    return 0;
   }
 };
 

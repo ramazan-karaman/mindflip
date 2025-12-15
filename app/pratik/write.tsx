@@ -25,6 +25,7 @@ import Animated, {
     withTiming
 } from 'react-native-reanimated';
 import * as CardRepository from '../../lib/repositories/cardRepository';
+import { savePracticeSession } from '../../lib/services/practiceService';
 import { Card } from '../../lib/types';
 
 const { width } = Dimensions.get('window');
@@ -56,6 +57,10 @@ export default function TypingScreen() {
     const [totalInitialCards, setTotalInitialCards] = useState(0);
     const [mistakeSet, setMistakeSet] = useState<Set<number>>(new Set());
 
+    const startTimeRef = useRef<number>(Date.now());
+    const correctCountRef = useRef<number>(0);
+    const wrongCountRef = useRef<number>(0);
+
     // --- ANİMASYON DEĞERLERİ ---
     const inputShake = useSharedValue(0);
 
@@ -63,8 +68,28 @@ export default function TypingScreen() {
         loadGameData();
     }, [deckId]);
 
+    useEffect(() => {
+        if (gameOver && deckId) {
+            const endTime = Date.now();
+            const duration = endTime - startTimeRef.current;
+            
+            // Servisi çağır (Arka plan işlemi)
+            savePracticeSession({
+                deckId: parseInt(deckId),
+                correctCount: correctCountRef.current,
+                wrongCount: wrongCountRef.current,
+                durationMs: duration,
+                mode: 'write' // <--- Mod: Yazma
+            });
+        }
+    }, [gameOver]);
+
     const loadGameData = async () => {
         if (!deckId) return;
+        startTimeRef.current = Date.now();
+        correctCountRef.current = 0;
+        wrongCountRef.current = 0;
+
         try {
             const cards = await CardRepository.getCardByIdDeck(parseInt(deckId));
             if (cards.length === 0) {
@@ -105,6 +130,7 @@ export default function TypingScreen() {
 
         if (userAnswer === correctAnswer) {
             // ✅ DOĞRU
+            correctCountRef.current += 1;
             setFeedbackStatus('correct');
             // Titreşim yok (Sessiz başarı)
 
@@ -123,6 +149,7 @@ export default function TypingScreen() {
 
         } else {
             // ❌ YANLIŞ
+            wrongCountRef.current += 1;
             setFeedbackStatus('wrong');
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 

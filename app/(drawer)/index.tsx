@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
-import { useNavigation } from '@react-navigation/native';
+import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -32,12 +31,11 @@ import ExpandableFab from '../../components/ExpandableFab';
 import * as CardRepository from '../../lib/repositories/cardRepository';
 import * as DeckRepository from '../../lib/repositories/deckRepository';
 import { DeckWithCardCount } from '../../lib/types';
-import { RootDrawerParamList } from './_layout';
 
 const { width } = Dimensions.get('window');
 
 export default function IndexScreen() {
-  const navigation = useNavigation<DrawerNavigationProp<RootDrawerParamList>>();
+  const navigation = useNavigation();
   const queryClient = useQueryClient();
 
   // --- SHARE INTENT HOOK (YENİ ÖZELLİK) ---
@@ -280,13 +278,9 @@ export default function IndexScreen() {
   };
 
   const handleOpenGoalSheet = (deck: DeckWithCardCount) => {
-    if (deck.cardCount < 5) {
-      Alert.alert('Yetersiz kart', 'En az 5 kart gerekli.');
-      return;
-    }
     setSelectedDeck(deck);
-    setMaxGoal(deck.cardCount);
-    const currentGoalValue = deck.goal ?? 0;
+    setMaxGoal(Math.max(deck.cardCount, 1));
+    const currentGoalValue = deck.goal ?? 5;
     setCurrentGoal(currentGoalValue > 0 && currentGoalValue <= deck.cardCount ? currentGoalValue : 1);
     setIsGoalModalVisible(true);
   };
@@ -349,7 +343,7 @@ export default function IndexScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.searchRow}>
-        <TouchableOpacity onPress={() => navigation.openDrawer()}>
+        <TouchableOpacity onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
           <Ionicons name="menu" size={35} color="#333" />
         </TouchableOpacity>
         <View style={styles.searchContainer}>

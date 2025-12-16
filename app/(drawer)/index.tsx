@@ -448,6 +448,7 @@ export default function IndexScreen() {
       <ExpandableFab 
         onCreateDeck={() => setShowSheet(true)}
         onImportCsv={pickDocument}
+        onOpenLibrary={() => router.push('/library')}
       />
 
     </View>

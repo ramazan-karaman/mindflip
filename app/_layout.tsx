@@ -35,7 +35,7 @@ export default function RootLayout() {
         // Hata olsa bile uygulamayı açmaya çalışalım (Splash'te takılmasın)
       } finally {
         // UI render edilmeye hazır
-        setIsReady(true);
+        setIsReady(true); //burası açılacak
       }
     };
 
@@ -112,6 +112,12 @@ export default function RootLayout() {
                 name="pratik/random"
                 options={{ title: 'Rastgele' }}
               />
+
+              <Stack.Screen
+                name="library"
+                options={{ title: 'Kütüphane', headerShown: false }}
+              />
+              
             </Stack>
 
             <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />

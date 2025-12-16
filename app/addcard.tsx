@@ -192,7 +192,7 @@ export default function AddCardScreen() {
             source={
               frontImage
                 ? { uri: frontImage }
-                : require('../assets/images/mindfliplogo.png')
+                : require('../assets/images/icon.png')
             }
             style={[styles.previewImage, !frontImage && { opacity: 0.1 }]}
             resizeMode="cover"
@@ -231,7 +231,7 @@ export default function AddCardScreen() {
             source={
               backImage
                 ? { uri: backImage }
-                : require('../assets/images/mindfliplogo.png')
+                : require('../assets/images/icon.png')
             }
             style={[styles.previewImage, !backImage && { opacity: 0.1 }]}
             resizeMode="cover"

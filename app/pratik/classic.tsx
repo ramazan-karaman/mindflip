@@ -241,7 +241,7 @@ export default function ClassicScreen() {
            />
           ) : (
             <Image
-                source={require('../../assets/images/mindfliplogo.png')}
+                source={require('../../assets/images/icon.png')}
                 style={[styles.image, {opacity: 0.1}]}
                 resizeMode="contain"
             />
@@ -259,7 +259,7 @@ export default function ClassicScreen() {
            />
           ) : (
             <Image
-                source={require('../../assets/images/mindfliplogo.png')}
+                source={require('../../assets/images/icon.png')}
                 style={[styles.image, {opacity: 0.1}]}
                 resizeMode="contain"
             />

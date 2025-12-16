@@ -28,7 +28,7 @@ function CustomDrawerContent(props: any) {
         <View style={[styles.headerContainer, headerStyles]}>
           <View style={styles.profileContainer}>
             <Image
-              source={require('../../assets/images/mindfliplogo.png')}
+              source={require('../../assets/images/icon.png')}
               style={styles.profileImage}
             />
             <Text style={[styles.profileName, profileNameStyles]}>MindFlip</Text>

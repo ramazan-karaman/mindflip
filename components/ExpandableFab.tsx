@@ -7,31 +7,30 @@ import {
   View,
 } from 'react-native';
 import Animated, {
-  Easing, // YENİ: Yumuşak geçiş eğrisi için
+  Easing,
   useAnimatedStyle,
   useSharedValue,
-  withTiming, // YENİ: Sallanmayı önlemek için Spring yerine Timing
+  withTiming,
 } from 'react-native-reanimated';
 
 interface ExpandableFabProps {
   onCreateDeck: () => void;
   onImportCsv: () => void;
+  onOpenLibrary: () => void; 
 }
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
-export default function ExpandableFab({ onCreateDeck, onImportCsv }: ExpandableFabProps) {
+export default function ExpandableFab({ onCreateDeck, onImportCsv, onOpenLibrary }: ExpandableFabProps) {
   const [isOpen, setIsOpen] = useState(false);
   const animation = useSharedValue(0);
 
   const toggleMenu = () => {
     const nextValue = isOpen ? 0 : 1;
     
-    // DEĞİŞİKLİK BURADA:
-    // withSpring (sallanan yay) yerine withTiming (net geçiş) kullanıyoruz.
     animation.value = withTiming(nextValue, {
-      duration: 250, // 250 milisaniyede tamamla
-      easing: Easing.out(Easing.quad), // Sona doğru yavaşça dur
+      duration: 250,
+      easing: Easing.out(Easing.quad),
     });
     
     setIsOpen(!isOpen);
@@ -44,23 +43,34 @@ export default function ExpandableFab({ onCreateDeck, onImportCsv }: ExpandableF
     };
   });
 
-  // 1. Buton (CSV Import) Animasyonu
-  const importButtonStyle = useAnimatedStyle(() => {
+  // --- 3. SEVİYE: KÜTÜPHANE BUTONU (EN ÜSTTE) ---
+  const libraryButtonStyle = useAnimatedStyle(() => {
     return {
       transform: [
-        { scale: animation.value }, // Büyüyerek gel
-        { translateY: animation.value * -130 }, // Yukarı kay
+        { scale: animation.value },
+        { translateY: animation.value * -190 }, // En yukarı (-190)
       ],
-      opacity: animation.value, // Görünür ol
+      opacity: animation.value,
     };
   });
 
-  // 2. Buton (Deste Ekle) Animasyonu
+  // --- 2. SEVİYE: CSV IMPORT BUTONU (ORTADA) ---
+  const importButtonStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { scale: animation.value },
+        { translateY: animation.value * -130 }, // Orta (-130)
+      ],
+      opacity: animation.value,
+    };
+  });
+
+  // --- 1. SEVİYE: DESTE EKLE BUTONU (EN ALTTA) ---
   const createButtonStyle = useAnimatedStyle(() => {
     return {
       transform: [
         { scale: animation.value },
-        { translateY: animation.value * -70 },
+        { translateY: animation.value * -70 }, // Alt (-70)
       ],
       opacity: animation.value,
     };
@@ -68,6 +78,18 @@ export default function ExpandableFab({ onCreateDeck, onImportCsv }: ExpandableF
 
   return (
     <View style={styles.container}>
+      
+      {/* --- YENİ: KÜTÜPHANE / HAZIR DESTE BUTONU --- */}
+      <Animated.View style={[styles.actionBtnContainer, libraryButtonStyle]}>
+        <View style={styles.labelContainer}>
+          <Text style={styles.labelText}>Hazır Deste İndir</Text>
+        </View>
+        {/* Rengi Mor (#9C27B0) yaptık ki diğerlerinden ayrılsın  */}
+        <TouchableOpacity style={[styles.subBtn, { backgroundColor: '#9C27B0' }]} onPress={() => { toggleMenu(); onOpenLibrary(); }}>
+          <Ionicons name="library-outline" size={20} color="white" />
+        </TouchableOpacity>
+      </Animated.View>
+
       {/* --- CSV IMPORT BUTONU --- */}
       <Animated.View style={[styles.actionBtnContainer, importButtonStyle]}>
         <View style={styles.labelContainer}>
@@ -129,7 +151,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     right: 5,
-    width: 200,
+    width: 200, // Label sığsın diye genişlik yeterli olmalı
   },
   subBtn: {
     width: 44,

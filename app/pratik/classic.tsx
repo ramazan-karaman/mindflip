@@ -27,16 +27,33 @@ import * as CardRepository from '../../lib/repositories/cardRepository';
 import * as DeckRepository from '../../lib/repositories/deckRepository';
 import { Card } from '../../lib/types';
 
-// YENİ: Servisi import et
+import { useTheme } from '../../lib/ThemeContext';
 import { savePracticeSession } from '../../lib/services/practiceService';
 import { calculateNextReview } from '../../lib/services/srsService';
 
-// --- (ESKİ calculateSRS FONKSİYONUNU SİL) ---
 
 export default function ClassicScreen() {
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
   const navigation = useNavigation();
   const queryClient = useQueryClient();
+
+  const { isDark } = useTheme();
+  const colors = {
+    background: isDark ? '#000000' : '#f0f4f8',
+    cardBg: isDark ? '#1C1C1E' : '#ffffff',
+    text: isDark ? '#ffffff' : '#333333',
+    subText: isDark ? '#aaaaaa' : '#555555',
+    border: isDark ? '#333333' : '#dddddd',
+    icon: isDark ? '#666666' : '#cccccc',
+    progressBg: isDark ? '#2C2C2E' : '#ffffff',
+    
+    // Bonus Rozeti
+    bonusBg: isDark ? '#3E2723' : '#FFF3E0',
+    bonusBorder: isDark ? '#5D4037' : '#FFE0B2',
+    
+    // Görsel Placeholder
+    imagePlaceholder: isDark ? '#333' : '#f9f9f9',
+  };
 
   const id = deckId && typeof deckId === 'string' ? parseInt(deckId, 10) : NaN;
 
@@ -64,15 +81,9 @@ export default function ClassicScreen() {
     queryFn: async () => {
       if (isNaN(id)) throw new Error('Geçersiz Deste ID');
 
-      // 1. Hedefi al
       const currentDeck = await DeckRepository.getDeckById(id);
       const sessionLimit = (currentDeck?.goal && currentDeck.goal > 0) ? currentDeck.goal : 10;
-
-      // 2. Akıllı kuyruğu veritabanından çek (3 Adımlı Lojik)
-      // cardRepository'e eklediğimiz getSmartPracticeQueue fonksiyonu
       const queue = await CardRepository.getSmartPracticeQueue(id, sessionLimit);
-
-      // 3. Karıştır ve Sun
       return queue.sort(() => Math.random() - 0.5);
     },
     enabled: !isNaN(id),
@@ -131,7 +142,6 @@ export default function ClassicScreen() {
       wrongCountRef.current += 1;
     }
 
-    // YENİ: Servis üzerinden hesaplama yapılıyor
     const { interval, easeFactor, nextReview } = calculateNextReview(
       currentCard,
       quality
@@ -158,16 +168,14 @@ export default function ClassicScreen() {
     const endTime = Date.now();
     const duration = endTime - startTimeRef.current; // Geçen süre (ms)
 
-    // 1. Servisi çağır (Arka planda kaydeder)
     savePracticeSession({
       deckId: id,
       correctCount: correctCountRef.current,
       wrongCount: wrongCountRef.current,
       durationMs: duration,
-      mode: 'classic' // <--- Modu özellikle belirtiyoruz
+      mode: 'classic' 
     });
 
-    // 2. Kullanıcıya bilgi ver
     Alert.alert(
       'Tebrikler!',
       `Oturum tamamlandı.\n\nDoğru: ${correctCountRef.current}\nTekrar: ${wrongCountRef.current}`,
@@ -175,7 +183,6 @@ export default function ClassicScreen() {
     );
   };
 
-  // Kartın Bonus olup olmadığını kontrol et
   const isBonusCard = (card: Card) => {
     if (!card.nextReview) return false; 
     return new Date(card.nextReview).getTime() > new Date().getTime();
@@ -183,48 +190,48 @@ export default function ClassicScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color="#2196F3" />
-        <Text style={styles.infoText}>Akıllı oturum hazırlanıyor...</Text>
+        <Text style={[styles.infoText, { color: colors.subText }]}>Akıllı oturum hazırlanıyor...</Text>
       </View>
     );
   }
 
   if (isError) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Ionicons name="alert-circle-outline" size={64} color="red" />
-        <Text style={styles.infoText}>Hata oluştu.</Text>
+        <Text style={[styles.infoText, { color: colors.subText }]}>Hata oluştu.</Text>
       </View>
     );
   }
 
   if (!practiceQueue || practiceQueue.length === 0) {
     return (
-      <View style={styles.container}>
-        <Ionicons name="layers-outline" size={64} color="#ccc" />
-        <Text style={styles.infoText}>Bu destede hiç kart yok.</Text>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Ionicons name="layers-outline" size={64} color={colors.icon} />
+        <Text style={[styles.infoText, { color: colors.subText }]}>Bu destede hiç kart yok.</Text>
       </View>
     );
   }
 
   const currentCard = practiceQueue[currentIndex];
-  if (!currentCard) return <View style={styles.container} />;
+  if (!currentCard) return <View style={[styles.container, { backgroundColor: colors.background }]}/>;
 
   const bonus = isBonusCard(currentCard);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Üst Bilgi */}
       <View style={styles.topInfoContainer}>
         {bonus && (
-            <View style={styles.bonusBadge}>
+            <View style={[styles.bonusBadge, { backgroundColor: colors.bonusBg, borderColor: colors.bonusBorder }]}>
                 <Ionicons name="flash" size={12} color="#FF9800" style={{marginRight: 4}} />
                 <Text style={styles.bonusText}>PEKİŞTİRME</Text>
             </View>
         )}
-        <View style={styles.progressContainer}>
-            <Text style={styles.progressText}>
+        <View style={[styles.progressContainer, { backgroundColor: colors.progressBg }]}>
+            <Text style={[styles.progressText, { color: colors.text }]}>
             {currentIndex + 1} / {practiceQueue.length}
             </Text>
         </View>
@@ -232,39 +239,48 @@ export default function ClassicScreen() {
 
       <TouchableOpacity onPress={flipCard} activeOpacity={0.9}>
         {/* ÖN YÜZ */}
-        <Animated.View style={[styles.card, frontAnimatedStyle]}>
+        <Animated.View style={[
+            styles.card, 
+            frontAnimatedStyle, 
+            { backgroundColor: colors.cardBg, borderColor: colors.border }
+        ]}>
           {currentCard.front_image ? (
              <Image
              source={{ uri: currentCard.front_image }}
-             style={styles.image}
+             style={[styles.image, { backgroundColor: colors.imagePlaceholder }]}
              resizeMode="cover"
            />
           ) : (
             <Image
                 source={require('../../assets/images/icon.png')}
                 style={[styles.image, {opacity: 0.1}]}
-                resizeMode="contain"
+                resizeMode="cover"
             />
           )}
-          <Text style={styles.termText}>{currentCard.front_word}</Text>
+          <Text style={[styles.termText, { color: colors.text }]}>{currentCard.front_word}</Text>
         </Animated.View>
 
         {/* ARKA YÜZ */}
-        <Animated.View style={[styles.card, styles.cardBack, backAnimatedStyle]}>
+        <Animated.View style={[
+            styles.card, 
+            styles.cardBack, 
+            backAnimatedStyle,
+            { backgroundColor: colors.cardBg, borderColor: colors.border }
+        ]}>
            {currentCard.back_image ? (
              <Image
              source={{ uri: currentCard.back_image }}
-             style={styles.image}
+             style={[styles.image, { backgroundColor: colors.imagePlaceholder }]}
              resizeMode="cover"
            />
           ) : (
             <Image
                 source={require('../../assets/images/icon.png')}
                 style={[styles.image, {opacity: 0.1}]}
-                resizeMode="contain"
+                resizeMode="cover"
             />
           )}
-          <Text style={styles.termText}>{currentCard.back_word}</Text>
+          <Text style={[styles.termText, { color: colors.text }]}>{currentCard.back_word}</Text>
         </Animated.View>
       </TouchableOpacity>
 
@@ -296,7 +312,6 @@ export default function ClassicScreen() {
 }
 
 const styles = StyleSheet.create({
-  // ... (Stiller aynı kalabilir)
   container: {
     flex: 1,
     justifyContent: 'center',

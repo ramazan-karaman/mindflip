@@ -1,6 +1,5 @@
-import { SQLiteRunResult } from 'expo-sqlite';
-// DEĞİŞİKLİK: File sınıfını alıyoruz
 import { File } from 'expo-file-system';
+import { SQLiteRunResult } from 'expo-sqlite';
 import { db } from '../db';
 import { Deck, DeckWithCardCount } from '../types';
 import * as CardRepository from './cardRepository';

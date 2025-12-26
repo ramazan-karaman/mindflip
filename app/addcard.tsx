@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-// YENİ MİMARİ: File ve Paths sınıflarını import ediyoruz
 import { File, Paths } from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
@@ -19,11 +18,25 @@ import {
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as CardRepository from '../lib/repositories/cardRepository';
+import { useTheme } from '../lib/ThemeContext';
 
 export default function AddCardScreen() {
   const { deckId } = useLocalSearchParams();
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  const { isDark } = useTheme();
+
+  const colors = {
+    background: isDark ? '#000000' : '#f7f7f7',
+    inputBg: isDark ? '#1C1C1E' : '#ffffff',
+    text: isDark ? '#ffffff' : '#333333',
+    label: isDark ? '#cccccc' : '#555555',
+    border: isDark ? '#333333' : '#dddddd',
+    placeholder: isDark ? '#666666' : '#888888',
+    imagePlaceholderBg: isDark ? '#2C2C2E' : '#eee',
+    removeBtnBg: isDark ? '#2C2C2E' : '#ffffff',
+  };
 
   const [frontWord, setFrontWord] = useState('');
   const [backWord, setBackWord] = useState('');
@@ -79,7 +92,6 @@ export default function AddCardScreen() {
     );
   };
 
-  // --- GERÇEK ÇÖZÜM: Yeni File System API ---
   const saveImagePermanently = async (uri: string | null): Promise<string | null> => {
     if (!uri) return null;
 
@@ -95,9 +107,6 @@ export default function AddCardScreen() {
       const destinationDir = Paths.document;
 
       // 4. Kopyalama İşlemi
-      // HATA BURADAYDI: Eskiden buraya string veriyorduk. 
-      // Şimdi 'destinationDir' nesnesini veriyoruz. 
-      // Bu işlem dosyayı o klasörün içine, aynı isimle kopyalar.
       await sourceFile.copy(destinationDir);
 
       console.log('Resim yeni sisteme göre taşındı.');
@@ -167,14 +176,14 @@ export default function AddCardScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.inputContainer}>
-        <Text style={styles.label}>Ön Yüz</Text>
-        <View style={styles.textInputWrapper}>
+        <Text style={[styles.label, { color: colors.label }]}>Ön Yüz</Text>
+        <View style={[styles.textInputWrapper, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { color: colors.text }]}
             placeholder="Ön kelime veya cümle"
-            placeholderTextColor="#888"
+            placeholderTextColor={colors.placeholder}
             value={frontWord}
             onChangeText={setFrontWord}
             autoFocus={true}
@@ -194,12 +203,12 @@ export default function AddCardScreen() {
                 ? { uri: frontImage }
                 : require('../assets/images/icon.png')
             }
-            style={[styles.previewImage, !frontImage && { opacity: 0.1 }]}
+            style={[styles.previewImage,{ backgroundColor: colors.imagePlaceholderBg }, !frontImage && { opacity: 0.1,tintColor: colors.text }]}
             resizeMode="cover"
           />
           {frontImage && (
             <TouchableOpacity
-              style={styles.removeImageButton}
+              style={[styles.removeImageButton, { backgroundColor: colors.removeBtnBg }]}
               onPress={() => setFrontImage(null)}
             >
               <Ionicons name="close-circle" size={30} color="red" />
@@ -209,13 +218,13 @@ export default function AddCardScreen() {
       </View>
 
       <View style={styles.inputContainer}>
-        <Text style={styles.label}>Arka Yüz</Text>
-        <View style={styles.textInputWrapper}>
+        <Text style={[styles.label, { color: colors.label }]}>Arka Yüz</Text>
+        <View style={[styles.textInputWrapper, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
           <TextInput
             ref={backWordInputRef}
-            style={styles.input}
+            style={[styles.input, { color: colors.text }]}
             placeholder="Arka kelime veya cümle"
-            placeholderTextColor="#888"
+            placeholderTextColor={colors.placeholder}
             value={backWord}
             onChangeText={setBackWord}
             returnKeyType="done"
@@ -233,12 +242,12 @@ export default function AddCardScreen() {
                 ? { uri: backImage }
                 : require('../assets/images/icon.png')
             }
-            style={[styles.previewImage, !backImage && { opacity: 0.1 }]}
+            style={[styles.previewImage,{ backgroundColor: colors.imagePlaceholderBg }, !backImage && { opacity: 0.1, tintColor: colors.text }]}
             resizeMode="cover"
           />
           {backImage && (
             <TouchableOpacity
-              style={styles.removeImageButton}
+              style={[styles.removeImageButton, { backgroundColor: colors.removeBtnBg }]}
               onPress={() => setBackImage(null)}
             >
               <Ionicons name="close-circle" size={30} color="red" />

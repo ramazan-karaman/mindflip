@@ -1,6 +1,5 @@
-import { SQLiteRunResult } from "expo-sqlite";
-// DEĞİŞİKLİK: Eski 'FileSystem' yerine yeni 'File' sınıfını alıyoruz
 import { File } from 'expo-file-system';
+import { SQLiteRunResult } from "expo-sqlite";
 import { db } from "../db";
 import { Card } from '../types';
 
@@ -12,14 +11,11 @@ const deleteImageFile = async (uri: string | null) => {
     const file = new File(uri);
 
     // 2. Varsa sil
-    // Yeni API'de exists() kontrolü yapmadan delete() çağırmak genelde güvenlidir
-    // ama temizlik açısından kontrol edebiliriz.
     if (file.exists) {
         await file.delete();
         console.log(`Resim dosyası temizlendi (Yeni Sistem): ${uri}`);
     }
   } catch (error) {
-    // Dosya zaten yoksa veya başka bir sorun varsa akışı bozma
     console.warn(`Dosya silinemedi (Önemsiz): ${uri}`, error);
   }
 };
@@ -200,7 +196,6 @@ export const deleteCard = async (id: number): Promise<SQLiteRunResult> => {
     const cardToDelete = await getCardById(id);
 
     if (cardToDelete) {
-      // YENİ SİLME FONKSİYONUNU ÇAĞIRIYORUZ
       await deleteImageFile(cardToDelete.front_image);
       await deleteImageFile(cardToDelete.back_image);
     }

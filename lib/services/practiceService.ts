@@ -23,35 +23,29 @@ export const savePracticeSession = async ({
 
   const totalCards = correctCount + wrongCount;
   
-  // Eski başarı oranı (İstatistik tablosu için hala hesaplayabiliriz ama practice tablosuna yazmayacağız)
   const successRate = totalCards > 0 
     ? Math.round((correctCount / totalCards) * 100) 
     : 0;
 
   try {
     // 1. PRATİK GEÇMİŞİNE KAYDET (YENİ FORMAT)
-    // Artık successRate yerine correct/wrong count gönderiyoruz.
     await PracticeRepository.createPractice(
       deckId,
       dateISO,
       durationMs,
-      correctCount, // YENİ
-      wrongCount,   // YENİ
+      correctCount,
+      wrongCount,
       mode
     );
     console.log(`✅ ${mode} pratik geçmişi kaydedildi (Doğru: ${correctCount}, Yanlış: ${wrongCount}).`);
 
-    // 2. GÜNLÜK İSTATİSTİKLERİ GÜNCELLE (OPSİYONEL AMA TAVSİYE EDİLİR)
-    // Bu tabloyu sadece genel bir özet olarak tutuyoruz.
-    // Detaylı analizleri artık doğrudan practices tablosundan yapıyoruz.
+    // 2. GÜNLÜK İSTATİSTİKLERİ GÜNCELLE 
     const todayStat = await StatisticRepository.getStatisticByDate(dateYMD);
 
-    // Karar: Hangi modda çalışılırsa çalışılsın, kart sayısı istatistiğe eklensin mi?
-    // Evet, kullanıcı bir emek harcadı. Ama "Learned" (Öğrenilen) sadece SRS ile artmalı.
     const cardsToAdd = totalCards; 
 
     if (todayStat) {
-      // Başarı oranı ortalamasını güncelle (Ağırlıklı ortalama daha iyi olurdu ama şimdilik basit ortalama)
+      // Başarı oranı ortalamasını güncelle 
       const currentRate = todayStat.practice_success_rate || 0;
       const newAvgSuccess = Math.round((currentRate + successRate) / 2);
 

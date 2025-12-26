@@ -7,19 +7,20 @@ import {
   Image,
   StyleSheet,
   Text,
-  useColorScheme,
-  View,
+  View
 } from 'react-native';
+import { useTheme } from '../../lib/ThemeContext';
 
 // Custom Drawer İçeriği (Profil resmi, menü, versiyon vb.)
 function CustomDrawerContent(props: any) {
-  const colorScheme = useColorScheme();
+  const { isDark } = useTheme();
 
-  const headerStyles = { backgroundColor: colorScheme === 'dark' ? '#000' : '#fff' };
-  const profileNameStyles = { color: colorScheme === 'dark' ? '#fff' : '#333' };
-  const menuContainerStyles = { backgroundColor: colorScheme === 'dark' ? '#000' : '#fff' };
-  const footerBorderStyles = { borderTopColor: colorScheme === 'dark' ? '#333' : '#eee' };
-  const versionTextStyles = { color: colorScheme === 'dark' ? '#555' : '#aaa' };
+
+  const headerStyles = { backgroundColor: isDark  ? '#000' : '#fff' };
+  const profileNameStyles = { color: isDark ? '#fff' : '#333' };
+  const menuContainerStyles = { backgroundColor: isDark ? '#000' : '#fff' };
+  const footerBorderStyles = { borderTopColor: isDark ? '#333' : '#eee' };
+  const versionTextStyles = { color: isDark ? '#555' : '#aaa' };
 
   return (
     <View style={{ flex: 1 }}>
@@ -52,23 +53,23 @@ function CustomDrawerContent(props: any) {
 }
 
 export default function DrawerLayout() {
-  const colorScheme = useColorScheme();
+  const { isDark } = useTheme();
 
   return (
     <Drawer
       drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={{
-        headerShown: false, // Header görünsün (Hamburger menü için)
+        headerShown: false,
         headerStyle: { backgroundColor: '#2196F3' },
         headerTintColor: '#fff',
         drawerActiveTintColor: '#2196F3',
-        drawerInactiveTintColor: colorScheme === 'dark' ? '#999' : '#555',
+        drawerInactiveTintColor: isDark ? '#999' : '#555',
         drawerLabelStyle: { marginLeft: -5, fontSize: 16 },
-        drawerStyle: { backgroundColor: colorScheme === 'dark' ? '#000' : '#fff' },
+        drawerStyle: { backgroundColor: isDark ? '#000' : '#fff' },
       }}
     >
       <Drawer.Screen
-        name="index" // app/(drawer)/index.tsx dosyasını temsil eder
+        name="index"
         options={{
           drawerLabel: 'Anasayfa',
           title: 'MindFlip',
@@ -79,7 +80,7 @@ export default function DrawerLayout() {
       />
       
       <Drawer.Screen
-        name="stats" // app/(drawer)/stats.tsx dosyasını temsil eder
+        name="stats"
         options={{
           drawerLabel: 'İstatistikler',
           title: 'İstatistikler',
@@ -88,6 +89,18 @@ export default function DrawerLayout() {
           ),
         }}
       />
+
+      <Drawer.Screen
+        name="settings" // Dosya adı: settings.tsx
+        options={{
+          drawerLabel: 'Ayarlar',
+          title: 'Ayarlar',
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      
     </Drawer>
   );
 }

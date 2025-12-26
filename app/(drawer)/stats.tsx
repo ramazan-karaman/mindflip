@@ -15,17 +15,39 @@ import {
 import { PieChart } from 'react-native-gifted-charts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Bileşenler ve Repolar
 import DailyRing from '../../components/stats/DailyRing';
 import RadarChart from '../../components/stats/RadarChart';
 import * as PracticeRepository from '../../lib/repositories/practiceRepository';
 import * as StatisticRepository from '../../lib/repositories/statisticRepository';
+import { useTheme } from '../../lib/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 export default function StatsScreen() {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
+  const { isDark } = useTheme();
+
+  const colors = {
+    background: isDark ? '#000000' : '#F8F9FA',
+    card: isDark ? '#1C1C1E' : '#FFFFFF',
+    text: isDark ? '#FFFFFF' : '#333333',
+    subText: isDark ? '#AAAAAA' : '#888888',
+    icon: isDark ? '#FFFFFF' : '#666666',
+    streakBg: isDark ? '#3E2723' : '#FFF3E0', // Koyu turuncu / Açık turuncu
+    heroStatsBg: isDark ? '#0D47A1' : '#E3F2FD', // Koyu mavi / Açık mavi
+    heroText: isDark ? '#90CAF9' : '#1976D2',
+    legendItemBg: isDark ? '#2C2C2E' : '#F9F9F9',
+    
+    // Aksiyon Kartları (Kırmızı/Turuncu Uyarılar)
+    actionCardBg: isDark ? '#1C1C1E' : '#FFFFFF',
+    actionIconBox: isDark ? '#3E2723' : '#FFF3E0',
+    
+    // Başarı Kartı (Yeşil)
+    successCardBg: isDark ? '#1B5E20' : '#E8F5E9',
+    successTitle: isDark ? '#A5D6A7' : '#2E7D32',
+    successDesc: isDark ? '#C8E6C9' : '#388E3C',
+  }
 
   // --- 1. VERİ ÇEKME (Yeni Repository Fonksiyonları) ---
   
@@ -63,9 +85,7 @@ export default function StatsScreen() {
   const stats = useMemo(() => {
     if (!practices || !mastery) return null;
 
-    // RADAR GRAFİĞİ (5 Boyut - Yeni Mod İsimleri)
-    // types.ts'deki PracticeMode tipleriyle eşleşmeli:
-    // 'classic', 'match', 'writing', 'true_false', 'multiple_choice'
+    // RADAR GRAFİĞİ (5 Boyut - Mod İsimleri)
     const modeCounts = { classic: 0, match: 0, truefalse: 0, write: 0, multiple: 0 };
     
     practices.forEach(p => {
@@ -94,19 +114,19 @@ export default function StatsScreen() {
         { value: mastery.mastered, color: '#4CAF50', text: 'Usta', focused: true },    // Canlı Yeşil
         { value: mastery.reviewing, color: '#42A5F5', text: 'İyi' },     // Soft Mavi
         { value: mastery.learning, color: '#FFA726', text: 'Çalışılıyor' }, // Turuncu
-        { value: mastery.new, color: '#CFD8DC', text: 'Yeni' },          // Açık Gri (Göz yormayan)
+        { value: mastery.new, color: isDark ? '#455A64' : '#CFD8DC', text: 'Yeni' },          // Açık Gri (Göz yormayan)
     ];
 
     return { radarData, masteryData, totalCards };
-  }, [practices, mastery]);
+  }, [practices, mastery, isDark]);
 
   const renderCenterLabel = () => {
     return (
         <View style={{ justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={{ fontSize: 28, color: '#333', fontWeight: 'bold' }}>
+            <Text style={{ fontSize: 28, color: colors.text, fontWeight: 'bold' }}>
                 {stats?.totalCards || 0}
             </Text>
-            <Text style={{ fontSize: 12, color: '#999', fontWeight: '600' }}>
+            <Text style={{ fontSize: 12, color: colors.subText, fontWeight: '600' }}>
                 Toplam
             </Text>
         </View>
@@ -116,27 +136,27 @@ export default function StatsScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color="#2196F3" />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
     <ScrollView 
-      style={styles.container} 
+      style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={{ paddingBottom: 40 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
     >
       
       {/* 1. HEADER */}
       <View style={styles.header}>
         <View>
-            <Text style={styles.greeting}>İyi Günler 👋</Text>
-            <Text style={styles.subGreeting}>İstikrar başarıyı getirir.</Text>
+            <Text style={[styles.greeting, { color: colors.text }]}>İyi Günler 👋</Text>
+            <Text style={[styles.subGreeting, { color: colors.subText }]}>İstikrar başarıyı getirir.</Text>
         </View>
-        <View style={styles.streakContainer}>
+        <View style={[styles.streakContainer, { backgroundColor: colors.streakBg }]}>
             <Ionicons name="flame" size={24} color="#FF5722" />
             <Text style={styles.streakText}>{streak || 0}</Text> 
         </View>
@@ -151,8 +171,8 @@ export default function StatsScreen() {
          />
          
          {/* Alt Bilgi */}
-         <View style={styles.heroStatsRow}>
-             <Text style={styles.heroStatText}>
+         <View style={[styles.heroStatsRow, { backgroundColor: colors.heroStatsBg }]}>
+             <Text style={[styles.heroStatText, { color: colors.heroText }]}>
                  Bugün Toplam {dailyProgress?.totalCardsStudied} Kart Çalışıldı
              </Text>
          </View>
@@ -160,14 +180,14 @@ export default function StatsScreen() {
 
       {/* 3. GELİŞİM FIRSATI (KIRMIZI BÖLGE) */}
       {weakCards && weakCards.length > 0 ? (
-          <View style={styles.actionCard}>
+          <View style={[styles.actionCard, { backgroundColor: colors.card }]}>
               <View style={styles.actionHeader}>
-                  <View style={styles.iconBox}>
+                  <View style={[styles.iconBox, { backgroundColor: colors.actionIconBox }]}>
                     <Ionicons name="fitness" size={24} color="#FF9800" />
                   </View>
                   <View style={{flex: 1}}>
-                      <Text style={styles.actionTitle}>Gelişim Fırsatı</Text>
-                      <Text style={styles.actionDesc}>
+                      <Text style={[styles.actionTitle, { color: colors.text }]}>Gelişim Fırsatı</Text>
+                      <Text style={[styles.actionDesc, { color: colors.subText }]}>
                           Toplam <Text style={{fontWeight: 'bold'}}>{weakCards.length} kart</Text> pekiştirme bekliyor.
                       </Text>
                   </View>
@@ -181,22 +201,22 @@ export default function StatsScreen() {
               </TouchableOpacity>
           </View>
       ) : (
-          <View style={[styles.actionCard, { backgroundColor: '#E8F5E9' }]}>
+          <View style={[styles.actionCard, { backgroundColor: colors.successCardBg }]}>
               <View style={styles.actionHeader}>
                   <Ionicons name="checkmark-circle" size={32} color="#4CAF50" />
                   <View style={{marginLeft: 10, flex: 1}}>
-                      <Text style={[styles.actionTitle, {color: '#2E7D32'}]}>Harika Gidiyorsun!</Text>
-                      <Text style={[styles.actionDesc, {color: '#388E3C'}]}>Zorlandığın kart yok.</Text>
+                      <Text style={[styles.actionTitle, {color: colors.successTitle}]}>Harika Gidiyorsun!</Text>
+                      <Text style={[styles.actionDesc, {color: colors.successDesc}]}>Zorlandığın kart yok.</Text>
                   </View>
               </View>
           </View>
       )}
 
       {/* 4. BECERİ ANALİZİ (RADAR) */}
-      <View style={styles.chartCard}>
+      <View style={[styles.chartCard, { backgroundColor: colors.card }]}>
           <View style={styles.cardTitleRow}>
-             <Ionicons name="analytics" size={20} color="#666" />
-             <Text style={styles.sectionTitle}>Beceri Analizi</Text>
+             <Ionicons name="analytics" size={20} color={colors.icon} />
+             <Text style={[styles.sectionTitle, { color: colors.text }]}>Beceri Analizi</Text>
           </View>
           
           <View style={{marginTop: 15, alignItems: 'center'}}>
@@ -208,10 +228,10 @@ export default function StatsScreen() {
       </View>
 
       {/* 5. GELECEK PLANI (BAR) */}
-     <View style={styles.chartCard}>
+     <View style={[styles.chartCard, { backgroundColor: colors.card }]}>
             <View style={styles.cardTitleRow}>
-               <Ionicons name="school" size={20} color="#666" />
-               <Text style={styles.sectionTitle}>Bilgi Deposu Durumu</Text>
+               <Ionicons name="school" size={20} color={colors.icon} />
+               <Text style={[styles.sectionTitle, { color: colors.text }]}>Bilgi Deposu Durumu</Text>
             </View>
             <Text style={styles.sectionSubtitle}>Kartlarının öğrenilme seviyeleri</Text>
             
@@ -221,46 +241,46 @@ export default function StatsScreen() {
                     data={stats?.masteryData || []}
                     donut
                     radius={90}
-                    innerRadius={65} // Daha ince ve şık bir halka
-                    centerLabelComponent={renderCenterLabel} // Ortada toplam sayı
-                    showText={false} // Dilimlerin üstüne yazı yazma, modern durmaz
-                    //roundedCorners // Dilim kenarlarını yumuşat
+                    innerRadius={65}
+                    centerLabelComponent={renderCenterLabel} 
+                    showText={false} 
+                    //roundedCorners 
                     strokeWidth={2}
-                    strokeColor="#fff" // Dilimler arası beyaz boşluk
+                    strokeColor={colors.card}
                 />
             </View>
 
             {/* MODERN GRID LEGEND */}
             <View style={styles.gridLegendContainer}>
                 {/* Usta */}
-                <View style={styles.legendItem}>
+                <View style={[styles.legendItem, { backgroundColor: colors.legendItemBg }]}>
                     <View style={[styles.dot, {backgroundColor: '#4CAF50'}]} />
                     <View>
-                        <Text style={styles.legendValue}>{mastery?.mastered || 0}</Text>
+                        <Text style={[styles.legendValue, { color: colors.text }]}>{mastery?.mastered || 0}</Text>
                         <Text style={styles.legendLabel}>Usta</Text>
                     </View>
                 </View>
                 {/* İyi */}
-                <View style={styles.legendItem}>
+                <View style={[styles.legendItem, { backgroundColor: colors.legendItemBg }]}>
                     <View style={[styles.dot, {backgroundColor: '#42A5F5'}]} />
                     <View>
-                        <Text style={styles.legendValue}>{mastery?.reviewing || 0}</Text>
+                        <Text style={[styles.legendValue, { color: colors.text }]}>{mastery?.reviewing || 0}</Text>
                         <Text style={styles.legendLabel}>İyi</Text>
                     </View>
                 </View>
                 {/* Çalışılıyor */}
-                <View style={styles.legendItem}>
+                <View style={[styles.legendItem, { backgroundColor: colors.legendItemBg }]}>
                     <View style={[styles.dot, {backgroundColor: '#FFA726'}]} />
                     <View>
-                        <Text style={styles.legendValue}>{mastery?.learning || 0}</Text>
+                        <Text style={[styles.legendValue, { color: colors.text }]}>{mastery?.learning || 0}</Text>
                         <Text style={styles.legendLabel}>Çalışılıyor</Text>
                     </View>
                 </View>
                 {/* Yeni */}
-                <View style={styles.legendItem}>
+                <View style={[styles.legendItem, { backgroundColor: colors.legendItemBg }]}>
                     <View style={[styles.dot, {backgroundColor: '#CFD8DC'}]} />
                     <View>
-                        <Text style={styles.legendValue}>{mastery?.new || 0}</Text>
+                        <Text style={[styles.legendValue, { color: colors.text }]}>{mastery?.new || 0}</Text>
                         <Text style={styles.legendLabel}>Yeni</Text>
                     </View>
                 </View>

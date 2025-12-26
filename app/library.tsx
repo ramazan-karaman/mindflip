@@ -17,10 +17,33 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as CardRepository from '../lib/repositories/cardRepository';
 import * as DeckRepository from '../lib/repositories/deckRepository';
 import * as LibraryRepository from '../lib/repositories/libraryRepository';
+import { useTheme } from '../lib/ThemeContext';
 
 export default function LibraryScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  const { isDark } = useTheme();
+
+  const colors = {
+    background: isDark ? '#000000' : '#FAFAFA',
+    headerBg: isDark ? '#1C1C1E' : '#FFFFFF',
+    text: isDark ? '#FFFFFF' : '#333333',
+    subText: isDark ? '#AAAAAA' : '#616161',
+    searchBarBg: isDark ? '#2C2C2E' : '#F5F5F5',
+    placeholder: isDark ? '#666666' : '#9E9E9E',
+    icon: isDark ? '#CCCCCC' : '#444444',
+    card: isDark ? '#1C1C1E' : '#FFFFFF',
+    border: isDark ? '#333333' : '#F5F5F5',
+    
+    // Rozetler (Badge)
+    catBadgeBg: isDark ? '#102027' : '#E3F2FD',
+    catBadgeText: isDark ? '#90CAF9' : '#1976D2',
+    levelBadgeBg: isDark ? '#1B3320' : '#F1F8E9',
+    levelBadgeText: isDark ? '#A5D6A7' : '#388E3C',
+    
+    emptyIcon: isDark ? '#444' : '#E0E0E0',
+  }
   
   // State'ler
   const [searchText, setSearchText] = useState('');
@@ -87,23 +110,23 @@ export default function LibraryScreen() {
     const isDownloading = downloadingIds.has(item.id);
 
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
         <View style={styles.cardHeader}>
-            <View style={styles.categoryBadge}>
-                <Text style={styles.categoryText}>{item.category || 'Genel'}</Text>
+            <View style={[styles.categoryBadge, { backgroundColor: colors.catBadgeBg }]}>
+                <Text style={[styles.categoryText, { color: colors.catBadgeText }]}>{item.category || 'Genel'}</Text>
             </View>
-            <View style={[styles.levelBadge]}>
-                <Text style={styles.levelText}>{item.difficulty || 'Kolay'}</Text>
+            <View style={[styles.levelBadge, { backgroundColor: colors.levelBadgeBg }]}>
+                <Text style={[styles.levelText, { color: colors.levelBadgeText }]}>{item.difficulty || 'Kolay'}</Text>
             </View>
         </View>
 
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.description}>{item.description}</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
+        <Text style={[styles.description, { color: colors.subText }]}>{item.description}</Text>
         
-        <View style={styles.footer}>
+        <View style={[styles.footer, { borderTopColor: colors.border }]}>
             <View style={styles.stats}>
-                <Ionicons name="albums-outline" size={16} color="#666" />
-                <Text style={styles.statsText}>{item.card_count} Kart</Text>
+                <Ionicons name="albums-outline" size={16} color={colors.subText} />
+                <Text style={[styles.statsText, { color: colors.subText }]}>{item.card_count} Kart</Text>
             </View>
 
             <TouchableOpacity 
@@ -126,25 +149,25 @@ export default function LibraryScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       
       {/* --- YENİ MODERN HEADER --- */}
       {/* Tek satırda: Geri Butonu + Arama Çubuğu */}
-      <View style={styles.headerContainer}>
+      <View style={[styles.headerContainer, { backgroundColor: colors.headerBg }]}>
         
         {/* Geri Dön Butonu */}
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={28} color="#444" />
+            <Ionicons name="arrow-back" size={28} color={colors.icon} />
         </TouchableOpacity>
 
         {/* Arama Çubuğu (Esnek Genişlik) */}
-        <View style={styles.searchBar}>
-            <Ionicons name="search" size={20} color="#757575" style={{ marginLeft: 8 }} />
+        <View style={[styles.searchBar, { backgroundColor: colors.searchBarBg }]}>
+            <Ionicons name="search" size={20} color={colors.placeholder} style={{ marginLeft: 8 }} />
             
             <TextInput
-                style={styles.searchInput}
+                style={[styles.searchInput, { color: colors.text }]}
                 placeholder="Mağazada deste ara..."
-                placeholderTextColor="#9E9E9E"
+                placeholderTextColor={colors.placeholder}
                 value={searchText}
                 onChangeText={setSearchText}
                 onSubmitEditing={handleSearch}
@@ -154,7 +177,7 @@ export default function LibraryScreen() {
             {/* Temizle Butonu (Varsa) */}
             {searchText.length > 0 && (
                 <TouchableOpacity onPress={() => { setSearchText(''); setQueryTerm(''); }}>
-                    <Ionicons name="close-circle" size={18} color="#BDBDBD" style={{ marginRight: 8 }} />
+                    <Ionicons name="close-circle" size={18} color={colors.placeholder} style={{ marginRight: 8 }} />
                 </TouchableOpacity>
             )}
 
@@ -168,13 +191,13 @@ export default function LibraryScreen() {
 
       {/* İÇERİK ALANI */}
       {isLoading ? (
-          <View style={styles.center}>
+          <View style={[styles.center, { backgroundColor: colors.background }]}>
               <ActivityIndicator size="large" color="#2196F3" />
           </View>
       ) : isError ? (
-        <View style={styles.center}>
-             <Ionicons name="cloud-offline-outline" size={60} color="#CFD8DC" />
-             <Text style={{marginTop: 15, color: '#90A4AE', fontSize: 16}}>Bağlantı Yok</Text>
+        <View style={[styles.center, { backgroundColor: colors.background }]}>
+             <Ionicons name="cloud-offline-outline" size={60} color={colors.emptyIcon} />
+             <Text style={{marginTop: 15, color: colors.subText, fontSize: 16}}>Bağlantı Yok</Text>
              <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
                  <Text style={{color: '#2196F3', fontWeight: 'bold'}}>Tekrar Dene</Text>
              </TouchableOpacity>
@@ -187,8 +210,8 @@ export default function LibraryScreen() {
             contentContainerStyle={{ padding: 16 }}
             ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                    <Ionicons name="library-outline" size={50} color="#E0E0E0" />
-                    <Text style={{ textAlign: 'center', marginTop: 10, color: '#9E9E9E' }}>
+                    <Ionicons name="library-outline" size={50} color={colors.emptyIcon} />
+                    <Text style={{ textAlign: 'center', marginTop: 10, color: colors.subText }}>
                         {queryTerm ? `"${queryTerm}" bulunamadı.` : 'Kütüphane şimdilik boş.'}
                     </Text>
                 </View>
@@ -223,11 +246,11 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   searchBar: {
-    flex: 1, // Kalan tüm alanı kapla
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5', // Hafif gri zemin
-    borderRadius: 12, // Yumuşak köşeler
+    backgroundColor: '#F5F5F5', 
+    borderRadius: 12, 
     height: 44,
     paddingHorizontal: 4,
   },

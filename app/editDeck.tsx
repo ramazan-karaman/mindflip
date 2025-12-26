@@ -14,6 +14,7 @@ import {
 import InputWithLimit from '../components/InputWithLimit';
 import * as CardRepository from '../lib/repositories/cardRepository';
 import * as DeckRepository from '../lib/repositories/deckRepository';
+import { useTheme } from '../lib/ThemeContext';
 import { Card } from '../lib/types';
 
 const LIMITS = {
@@ -25,6 +26,20 @@ export default function EditDeckScreen() {
   const { deckId } = useLocalSearchParams();
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  const { isDark } = useTheme();
+
+  const colors = {
+    background: isDark ? '#000000' : '#f7f7f7',
+    card: isDark ? '#1C1C1E' : '#ffffff',
+    text: isDark ? '#ffffff' : '#333333',
+    subText: isDark ? '#aaaaaa' : '#666666',
+    border: isDark ? '#333333' : '#dddddd',
+    inputBg: isDark ? '#2C2C2E' : '#ffffff',
+    placeholder: isDark ? '#666666' : '#999999',
+    icon: isDark ? '#aaaaaa' : '#cccccc',
+    emptyBorder: isDark ? '#444' : '#ccc',
+  };
 
   const id = deckId && typeof deckId === 'string' ? parseInt(deckId, 10) : NaN;
 
@@ -116,10 +131,10 @@ export default function EditDeckScreen() {
   // --- RENDER BİLEŞENLERİ ---
 
   const renderCardItem = ({ item }: { item: Card }) => (
-    <View style={styles.cardItem}>
+    <View style={[styles.cardItem, { backgroundColor: colors.card }]}>
       <View style={styles.cardTextContainer}>
-        <Text style={styles.cardTextFront} numberOfLines={1}>{item.front_word}</Text>
-        <Text style={styles.cardTextBack} numberOfLines={1}>{item.back_word}</Text>
+        <Text style={[styles.cardTextFront, { color: colors.text }]} numberOfLines={1}>{item.front_word}</Text>
+        <Text style={[styles.cardTextBack, { color: colors.subText }]} numberOfLines={1}>{item.back_word}</Text>
       </View>
       
       {/* Görsel varsa ikon göster */}
@@ -127,7 +142,7 @@ export default function EditDeckScreen() {
         <Ionicons
           name="image"
           size={20}
-          color="#ccc"
+          color={colors.icon}
           style={{ marginRight: 15 }}
         />
       )}
@@ -141,22 +156,32 @@ export default function EditDeckScreen() {
   // FlatList Header (Form Alanları Buraya Taşındı)
   const headerContent =(
     <View style={styles.headerContainer}>
-      <View style={styles.deckInfoContainer}>
-        <Text style={styles.sectionTitle}>Deste Bilgileri</Text>
+      <View style={[styles.deckInfoContainer, { backgroundColor: colors.card }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Deste Bilgileri</Text>
         <InputWithLimit
           limit={LIMITS.DECK_NAME}
           placeholder="Deste Adı"
           value={deckName}
           onChangeText={setDeckName}
-          style={styles.input}
+          placeholderTextColor={colors.placeholder}
+          style={[styles.input, { 
+              backgroundColor: colors.inputBg, 
+              borderColor: colors.border, 
+              color: colors.text 
+          }]}
         />
         <InputWithLimit
           limit={LIMITS.DECK_DESC}
           placeholder="Açıklama (İsteğe bağlı)"
           value={deckDescription}
           onChangeText={setDeckDescription}
+          placeholderTextColor={colors.placeholder}
           multiline
-          style={styles.descriptionInput} // Özel stil (height vb.)
+          style={[styles.descriptionInput, { 
+              backgroundColor: colors.inputBg, 
+              borderColor: colors.border, 
+              color: colors.text 
+          }]}
         />
         <TouchableOpacity
           style={[styles.saveButton, isUpdatingDeck && styles.saveButtonDisabled]}
@@ -171,7 +196,7 @@ export default function EditDeckScreen() {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.cardsHeader}>
+      <Text style={[styles.cardsHeader, { color: colors.text }]}>
         Kartlar ({cards ? cards.length : 0})
       </Text>
     </View>
@@ -179,14 +204,14 @@ export default function EditDeckScreen() {
 
   if (isLoadingDeck || isLoadingCards) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color="#2196F3" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={cards ?? []}
         renderItem={renderCardItem}
@@ -194,11 +219,11 @@ export default function EditDeckScreen() {
         ListHeaderComponent={headerContent}
         contentContainerStyle={{ paddingBottom: 40, padding:4 }}
         ListEmptyComponent={() => (
-          <View style={styles.emptyCardsContainer}>
-            <Text style={styles.emptyCardsText}>
+          <View style={[styles.emptyCardsContainer, { backgroundColor: colors.card, borderColor: colors.emptyBorder }]}>
+            <Text style={[styles.emptyCardsText, { color: colors.subText }]}>
               Bu destede henüz hiç kart yok.
             </Text>
-            <Text style={styles.emptyCardsSubText}>
+            <Text style={[styles.emptyCardsSubText, { color: colors.icon }]}>
               Ana sayfadan '+ Kart Ekle' butonunu kullanabilirsin.
             </Text>
           </View>

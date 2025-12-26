@@ -29,8 +29,6 @@ export const fetchLibraryDecks = async (searchQuery: string = ''): Promise<Remot
 
   // 2. Eğer arama metni (searchQuery) doluysa filtre ekle
   if (searchQuery) {
-    // 'ilike' => Case Insensitive Like (Büyük/küçük harf duyarsız arama)
-    // %işareti% => İçinde bu kelime geçenleri bul demektir.
     query = query.ilike('title', `%${searchQuery}%`);
   }
 

@@ -14,6 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as CardRepository from '../../lib/repositories/cardRepository';
 import { savePracticeSession } from '../../lib/services/practiceService';
+import { useTheme } from '../../lib/ThemeContext';
 import { Card } from '../../lib/types';
 
 const { width, height } = Dimensions.get('window');
@@ -31,6 +32,46 @@ interface GameCard extends Card {
 export default function TrueFalseScreen() {
     const { deckId } = useLocalSearchParams<{ deckId: string }>();
     const router = useRouter();
+
+    const { isDark } = useTheme();
+
+    const colors = {
+        background: isDark ? '#000000' : '#F5F7FA',
+        cardBg: isDark ? '#1C1C1E' : '#ffffff',
+        text: isDark ? '#ffffff' : '#333333',
+        subText: isDark ? '#aaaaaa' : '#555555',
+        border: isDark ? '#333333' : '#ECEFF1',
+        icon: isDark ? '#cccccc' : '#666666',
+        
+        // Kutular
+        boxBg: isDark ? '#2C2C2E' : '#ffffff',
+        boxBorder: isDark ? '#444' : '#ECEFF1',
+        boxLabelBg: isDark ? '#2C2C2E' : '#ffffff',
+        boxLabelText: isDark ? '#90A4AE' : '#90A4AE',
+        
+        // Bağlantı
+        connectorBg: isDark ? '#1C1C1E' : '#ffffff',
+        connectorBorder: isDark ? '#444' : '#ECEFF1',
+        
+        // İlerleme ve Skor
+        progressBg: isDark ? '#1C1C1E' : '#ffffff',
+        fireBg: isDark ? '#3E2723' : '#FFF3E0',
+        fireBorder: isDark ? '#5D4037' : '#FFE0B2',
+        fireText: isDark ? '#FFAB91' : '#FF9800',
+        scoreBg: isDark ? '#0D47A1' : '#E3F2FD',
+        scoreText: isDark ? '#64B5F6' : '#2196F3',
+        
+        // Sonuç Ekranı
+        resultBg: isDark ? '#000000' : '#ffffff',
+        statItemBg: isDark ? '#1C1C1E' : '#F5F7FA',
+        statItemFullBg: isDark ? '#1B5E20' : '#E8F5E9',
+        exitBtnBg: isDark ? '#000000' : '#ffffff',
+        exitBtnBorder: isDark ? '#333' : '#eee',
+        exitBtnText: isDark ? '#ccc' : '#666',
+        
+        imageBg: isDark ? '#121212' : '#F0F4F8',
+        imageBorder: isDark ? '#333' : '#EEF2F6',
+    };
 
     // --- OYUN DURUMU ---
     const [queue, setQueue] = useState<GameCard[]>([]);
@@ -152,7 +193,7 @@ export default function TrueFalseScreen() {
             wrongSwipesRef.current += 1;
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
-            setCurrentStreak(0); // Sıfırla ama UI'da 0 olarak kalsın, kaybolmasın
+            setCurrentStreak(0);
 
             setMistakeSet(prev => new Set(prev).add(currentCard.id));
 
@@ -201,11 +242,7 @@ export default function TrueFalseScreen() {
 
     // --- GÖSTERGE HESAPLAMALARI ---
 
-    // Kuyruktaki retry olmayan (yani orijinal) kart sayısı
     const remainingOriginalCards = queue.filter(q => !q.isRetry).length;
-
-    // Şu an kaçıncı karttayız? (Toplam - Kalan + 1). 
-    // Eğer oyun bittiyse queue 0 olacağı için taşma kontrolü yapıyoruz.
     const currentCardNumber = Math.min(totalInitialCards, totalInitialCards - remainingOriginalCards + 1);
 
     const progressPercent = totalInitialCards > 0 ? ((currentCardNumber) / totalInitialCards) * 100 : 0;
@@ -214,7 +251,6 @@ export default function TrueFalseScreen() {
         const hasImage = !!card.front_image;
         return (
             <View style={styles.cardInner}>
-                {/* NOT: Kartın üzerindeki kombo rozeti kaldırıldı. */}
 
                 {card.isRetry && (
                     <View style={styles.retryBadge}>
@@ -224,26 +260,26 @@ export default function TrueFalseScreen() {
                 )}
 
                 {hasImage && (
-                    <View style={styles.imageContainer}>
+                    <View style={[styles.imageContainer, { backgroundColor: colors.imageBg, borderColor: colors.imageBorder }]}>
                         <Image source={{ uri: card.front_image! }} style={styles.mainImage} resizeMode="cover" />
                     </View>
                 )}
 
                 <View style={[styles.textContainer, !hasImage && styles.textContainerFull]}>
-                    <View style={[styles.questionBox, !hasImage && styles.boxExpanded]}>
-                        <Text style={styles.boxLabel}>Terim</Text>
-                        <Text style={styles.questionText} adjustsFontSizeToFit numberOfLines={3}>{card.front_word}</Text>
+                    <View style={[styles.questionBox, !hasImage && styles.boxExpanded, { backgroundColor: colors.boxBg, borderColor: colors.boxBorder }]}>
+                        <Text style={[styles.boxLabel, { backgroundColor: colors.boxLabelBg, color: colors.boxLabelText }]}>Terim</Text>
+                        <Text style={[styles.questionText, { color: colors.text }]} adjustsFontSizeToFit numberOfLines={3}>{card.front_word}</Text>
                     </View>
 
                     <View style={styles.connector}>
-                        <View style={styles.connectorCircle}>
+                        <View style={[styles.connectorCircle, { backgroundColor: colors.connectorBg, borderColor: colors.connectorBorder }]}>
                             <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#2196F3' }}>?</Text>
                         </View>
                     </View>
 
-                    <View style={[styles.answerBox, !hasImage && styles.boxExpanded]}>
-                        <Text style={styles.boxLabel}>Karşılığı</Text>
-                        <Text style={styles.answerText} adjustsFontSizeToFit numberOfLines={3}>{card.displayBackWord}</Text>
+                    <View style={[styles.answerBox, !hasImage && styles.boxExpanded, { backgroundColor: colors.boxBg, borderColor: colors.boxBorder }]}>
+                        <Text style={[styles.boxLabel, { backgroundColor: colors.boxLabelBg, color: colors.boxLabelText }]}>Karşılığı</Text>
+                        <Text style={[styles.answerText, { color: colors.text }]} adjustsFontSizeToFit numberOfLines={3}>{card.displayBackWord}</Text>
                     </View>
                 </View>
             </View>
@@ -256,25 +292,25 @@ export default function TrueFalseScreen() {
         return Math.round((correctFirstTry / totalInitialCards) * 100);
     };
 
-    if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#2196F3" /></View>;
+    if (loading) return <View style={[styles.center, { backgroundColor: colors.background }]}><ActivityIndicator size="large" color="#2196F3" /></View>;
 
     if (gameOver) {
         const accuracy = calculateAccuracy();
         return (
-            <View style={styles.resultContainer}>
+            <View style={[styles.resultContainer, { backgroundColor: colors.resultBg }]}>
                 <Ionicons name="trophy" size={100} color="#FFD700" style={styles.trophyIcon} />
-                <Text style={styles.resultTitle}>Harika İş!</Text>
+                <Text style={[styles.resultTitle, { color: colors.text }]}>Harika İş!</Text>
 
                 <View style={styles.statsGrid}>
-                    <View style={styles.statItem}>
+                    <View style={[styles.statItem, { backgroundColor: colors.statItemBg }]}>
                         <Text style={styles.statLabel}>Toplam Puan</Text>
-                        <Text style={styles.statValue}>{score}</Text>
+                        <Text style={[styles.statValue, { color: colors.text }]}>{score}</Text>
                     </View>
-                    <View style={styles.statItem}>
+                    <View style={[styles.statItem, { backgroundColor: colors.statItemBg }]}>
                         <Text style={styles.statLabel}>Max Kombo</Text>
-                        <Text style={styles.statValue}>🔥 {maxStreak}</Text>
+                        <Text style={[styles.statValue, { color: colors.text }]}>🔥 {maxStreak}</Text>
                     </View>
-                    <View style={styles.statItemFull}>
+                    <View style={[styles.statItemFull, { backgroundColor: colors.statItemFullBg }]}>
                         <Text style={styles.statLabel}>Ustalık Yüzdesi</Text>
                         <Text style={[styles.statValue, { color: accuracy > 80 ? '#4CAF50' : '#FF9800' }]}>
                             %{accuracy}
@@ -288,8 +324,8 @@ export default function TrueFalseScreen() {
                         <Text style={styles.playAgainText}>Tekrar Oyna</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.exitBtn} onPress={() => router.back()}>
-                        <Text style={styles.exitBtnText}>Listeye Dön</Text>
+                    <TouchableOpacity style={[styles.exitBtn, { backgroundColor: colors.exitBtnBg, borderColor: colors.exitBtnBorder }]} onPress={() => router.back()}>
+                        <Text style={[styles.exitBtnText, { color: colors.exitBtnText }]}>Listeye Dön</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -300,34 +336,41 @@ export default function TrueFalseScreen() {
     const nextCard = queue[1];
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             {/* ÜST BAR (Header) */}
             <View style={styles.headerContainer}>
                 <View style={styles.topBar}>
                     {/* SOL: İLERLEME METNİ (Çıkış butonu yerine) */}
-                    <View style={styles.progressTextContainer}>
-                        <Text style={styles.progressLabel}>
+                    <View style={[styles.progressTextContainer, { backgroundColor: colors.progressBg }]}>
+                        <Text style={[styles.progressLabel, { color: colors.subText }]}>
                             {currentCardNumber} / {totalInitialCards}
                         </Text>
                     </View>
 
                     {/* SAĞ: KOMBO ve SKOR */}
                     <View style={styles.scoreWrapper}>
-                        {/* Kombo artık hep görünür (0 olsa bile) */}
-                        <View style={[styles.fireContainer, currentStreak === 0 && styles.fireContainerInactive]}>
-                            <Text style={[styles.fireText, currentStreak === 0 && styles.fireTextInactive]}>
+                        <View style={[
+                            styles.fireContainer, 
+                            { backgroundColor: colors.fireBg, borderColor: colors.fireBorder },
+                            currentStreak === 0 && { backgroundColor: isDark ? '#222' : '#F5F5F5', borderColor: isDark ? '#333' : '#E0E0E0' }
+                        ]}>
+                            <Text style={[
+                                styles.fireText, 
+                                { color: colors.fireText },
+                                currentStreak === 0 && { color: isDark ? '#555' : '#BDBDBD' }
+                            ]}>
                                 🔥 {currentStreak}
                             </Text>
                         </View>
 
-                        <View style={styles.scoreContainer}>
-                            <Text style={styles.scoreTextSmall}>{score}</Text>
+                        <View style={[styles.scoreContainer, { backgroundColor: colors.scoreBg }]}>
+                            <Text style={[styles.scoreTextSmall, { color: colors.scoreText }]}>{score}</Text>
                         </View>
                     </View>
                 </View>
 
                 {/* PROGRESS BAR */}
-                <View style={styles.progressBarBackground}>
+                <View style={[styles.progressBarBackground, { backgroundColor: isDark ? '#333' : '#E0E0E0' }]}>
                     <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
                 </View>
             </View>
@@ -335,14 +378,18 @@ export default function TrueFalseScreen() {
             {/* OYUN ALANI */}
             <View style={styles.gameArea}>
                 {nextCard && (
-                    <View style={[styles.card, styles.nextCard]}>
+                    <View style={[styles.card, styles.nextCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
                         {renderCardContent(nextCard)}
                     </View>
                 )}
 
                 {activeCard && (
                     <GestureDetector gesture={gesture}>
-                        <Animated.View style={[styles.card, animatedCardStyle]}>
+                        <Animated.View style={[
+                            styles.card, 
+                            animatedCardStyle,
+                            { backgroundColor: colors.cardBg, borderColor: colors.border }
+                        ]}>
                             <Animated.View style={[styles.overlay, styles.overlaySuccess, overlayStyleRight]}>
                                 <Ionicons name="checkmark-circle" size={80} color="white" />
                                 <Text style={styles.overlayText}>DOĞRU</Text>
@@ -359,7 +406,7 @@ export default function TrueFalseScreen() {
 
             {/* ALT BİLGİ (Sadece Metin) */}
             <View style={styles.footerHint}>
-                <Text style={styles.hintText}>Sola Yanlış / Sağa Doğru </Text>
+                <Text style={[styles.hintText, { color: colors.subText }]}>Sola Yanlış / Sağa Doğru </Text>
             </View>
         </View>
     );

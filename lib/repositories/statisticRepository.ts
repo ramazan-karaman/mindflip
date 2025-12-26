@@ -2,7 +2,7 @@ import { SQLiteRunResult } from 'expo-sqlite';
 import { db } from '../db';
 import { Card, Statistic } from '../types';
 
-// --- ESKİ CRUD İŞLEMLERİ (Özet Tablosu İçin - Korundu) ---
+// --- CRUD İŞLEMLERİ ---
 
 export const createStatistic = async (
   date: string, 
@@ -105,8 +105,6 @@ export const deleteStatistic = async (id: number): Promise<SQLiteRunResult> => {
   }
 };
 
-// --- YENİ VE GÜÇLÜ ANALİZ FONKSİYONLARI ---
-// StatsScreen ekranının kalbi burasıdır.
 
 export interface DailyProgress {
   totalDecks: number;       // Toplam Deste
@@ -120,12 +118,12 @@ export const getDailyProgress = async (): Promise<DailyProgress> => {
 
   try {
     // Mantık: Her deste için;
-    // - Deste hedefini al (yoksa 10 say)
+    // - Deste hedefini al (yoksa 5 say)
     // - Bugün o destede yapılan 'practices' tablosundaki (correct + wrong) toplamını al.
     const query = `
       SELECT 
         d.id, 
-        COALESCE(d.goal, 10) as targetGoal, 
+        COALESCE(d.goal, 5) as targetGoal, 
         (
           SELECT COALESCE(SUM(correct_count + wrong_count), 0)
           FROM practices p 

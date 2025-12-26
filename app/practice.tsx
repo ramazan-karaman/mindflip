@@ -7,6 +7,7 @@ import { StyleSheet, View } from "react-native";
 import DeckSelector from "../components/DeckSelector"; // Yeni bileşeni import ettik
 import PracticeModeCard from "../components/practiceModeCard";
 import * as DeckRepository from '../lib/repositories/deckRepository';
+import { useTheme } from '../lib/ThemeContext';
 import { DeckWithCardCount, PracticeRoute } from '../lib/types';
 
 // Modlar
@@ -21,6 +22,10 @@ const practiceModes = [
 
 export default function PracticeScreen() {
   const router = useRouter();
+  const { isDark } = useTheme();
+  const colors = {
+    background: isDark ? '#000000' : '#f7f7f7',
+  };
   
   // 1. URL'den deckId'yi çekiyoruz (Source of Truth)
   const { deckId } = useLocalSearchParams<{ deckId: string }>();
@@ -40,14 +45,12 @@ export default function PracticeScreen() {
   // 3. İlk Açılış Mantığı: Eğer URL'de ID yoksa ve desteler geldiyse, ilkini seç
   useEffect(() => {
     if (!activeDeckId && allDecks && allDecks.length > 0) {
-      // URL'yi güncelle (router.replace ile geçmişi kirletmeden)
       router.replace(`/practice?deckId=${allDecks[0].id}`);
     }
   }, [activeDeckId, allDecks]);
 
   // 4. Deste Değiştirme Fonksiyonu
   const handleDeckChange = (newDeckId: number) => {
-    // Sadece URL'i güncelliyoruz, gerisini React hallediyor
     router.setParams({ deckId: newDeckId.toString() });
   };
 
@@ -58,7 +61,7 @@ export default function PracticeScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       
       {/* ÜST KISIM: Deste Seçici Bileşeni */}
       <DeckSelector 

@@ -11,21 +11,60 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as CardRepository from '../../lib/repositories/cardRepository';
 import { savePracticeSession } from '../../lib/services/practiceService';
+import { useTheme } from '../../lib/ThemeContext'; // <-- 1. IMPORT
 import { Card } from '../../lib/types';
 
 const { width } = Dimensions.get('window');
 
 // Oyun için özelleştirilmiş kart tipi
 interface QuizCard extends Card {
-    displayBackWord: string; // Doğru cevap (arka yüz)
-    options: string[];       // 4 şık (1 doğru + 3 yanlış)
+    displayBackWord: string; 
+    options: string[];      
     correctOptionIndex: number;
-    isRetry?: boolean;       // Daha önce yanlış yapıldı mı?
+    isRetry?: boolean;      
 }
 
 export default function MultipleChoiceScreen() {
     const { deckId } = useLocalSearchParams<{ deckId: string }>();
     const router = useRouter();
+
+    // --- 2. TEMAYI ÇEK ---
+    const { isDark } = useTheme();
+
+    // --- 3. RENK PALETİ ---
+    const colors = {
+        background: isDark ? '#000000' : '#F5F7FA',
+        cardBg: isDark ? '#1C1C1E' : '#ffffff',
+        text: isDark ? '#ffffff' : '#263238',
+        subText: isDark ? '#aaaaaa' : '#555555',
+        border: isDark ? '#333333' : '#ECEFF1',
+        
+        // Header
+        progressBg: isDark ? '#1C1C1E' : '#ffffff',
+        progressText: isDark ? '#aaa' : '#555',
+        fireBg: isDark ? '#3E2723' : '#FFF3E0',
+        fireBorder: isDark ? '#5D4037' : '#FFE0B2',
+        fireText: isDark ? '#FFAB91' : '#FF9800',
+        scoreBg: isDark ? '#0D47A1' : '#E3F2FD',
+        scoreText: isDark ? '#64B5F6' : '#2196F3',
+        progressBarBg: isDark ? '#333' : '#E0E0E0',
+
+        // Seçenekler
+        optionBg: isDark ? '#1C1C1E' : '#ffffff',
+        optionBorder: isDark ? '#333333' : '#ECEFF1',
+        optionText: isDark ? '#E0E0E0' : '#455A64',
+        optionDimmedBg: isDark ? '#121212' : '#F5F5F5',
+        
+        // Sonuç Ekranı
+        resultBg: isDark ? '#000000' : '#ffffff',
+        statItemBg: isDark ? '#1C1C1E' : '#F5F7FA',
+        statItemFullBg: isDark ? '#1B5E20' : '#E8F5E9',
+        exitBtnBg: isDark ? '#000000' : '#ffffff',
+        exitBtnBorder: isDark ? '#333' : '#eee',
+        exitBtnText: isDark ? '#ccc' : '#666',
+        
+        imageBg: isDark ? '#121212' : '#F0F4F8',
+    };
 
     // --- DURUM YÖNETİMİ ---
     const [queue, setQueue] = useState<QuizCard[]>([]);
@@ -48,7 +87,6 @@ export default function MultipleChoiceScreen() {
     const wrongCountRef = useRef<number>(0);
 
     // --- ANİMASYON ---
-    // Kartın sağa/sola kayması için değer
     const contentTranslateX = useSharedValue(0);
     const contentOpacity = useSharedValue(1);
 
@@ -61,13 +99,12 @@ export default function MultipleChoiceScreen() {
             const endTime = Date.now();
             const duration = endTime - startTimeRef.current;
             
-            // Servisi çağır (Arka plan işlemi)
             savePracticeSession({
                 deckId: parseInt(deckId),
                 correctCount: correctCountRef.current,
                 wrongCount: wrongCountRef.current,
                 durationMs: duration,
-                mode: 'multiple' // <--- Modu belirtiyoruz
+                mode: 'multiple'
             });
         }
     }, [gameOver]);
@@ -80,7 +117,6 @@ export default function MultipleChoiceScreen() {
         try {
             const cards = await CardRepository.getCardByIdDeck(parseInt(deckId));
 
-            // Çoktan seçmeli için en az 4 kart lazım (1 doğru + 3 yanlış şık üretebilmek için)
             if (cards.length < 4) {
                 Alert.alert("Yetersiz Kart", "Çoktan seçmeli mod için destede en az 4 kart olmalıdır.", [
                     { text: "Geri Dön", onPress: () => router.back() }
@@ -99,16 +135,13 @@ export default function MultipleChoiceScreen() {
         const shuffledCards = [...cards].sort(() => Math.random() - 0.5);
 
         const quizCards: QuizCard[] = shuffledCards.map((card) => {
-            // Şık Oluşturma Mantığı
             const otherCards = cards.filter(c => c.id !== card.id);
-            // Rastgele 3 yanlış cevap seç
             const distractors = otherCards
                 .sort(() => Math.random() - 0.5)
                 .slice(0, 3)
                 .map(c => c.back_word);
 
             const options = [...distractors, card.back_word];
-            // Şıkları karıştır
             const shuffledOptions = options.sort(() => Math.random() - 0.5);
             const correctIndex = shuffledOptions.indexOf(card.back_word);
 
@@ -126,7 +159,7 @@ export default function MultipleChoiceScreen() {
     };
 
     const handleOptionSelect = (index: number) => {
-        if (isProcessing) return; // Çift tıklamayı önle
+        if (isProcessing) return; 
         setIsProcessing(true);
         setSelectedOptionIndex(index);
 
@@ -134,7 +167,6 @@ export default function MultipleChoiceScreen() {
         const isCorrect = index === currentCard.correctOptionIndex;
 
         if (isCorrect) {
-            // DOĞRU CEVAP: Titreşim YOK
             correctCountRef.current += 1;
             if (!currentCard.isRetry) {
                 const newStreak = currentStreak + 1;
@@ -142,24 +174,19 @@ export default function MultipleChoiceScreen() {
                 if (newStreak > maxStreak) setMaxStreak(newStreak);
                 setScore(s => s + 10 + (newStreak > 3 ? 5 : 0));
             }
-            // Hızlı geçiş
             setTimeout(() => animateTransition(true), 600);
         } else {
-            // YANLIŞ CEVAP: Titreşim VAR
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             wrongCountRef.current += 1;
             setCurrentStreak(0);
             setMistakeSet(prev => new Set(prev).add(currentCard.id));
 
-            // Kullanıcı doğrusunu görsün diye biraz daha uzun bekle
             setTimeout(() => animateTransition(false), 1500);
         }
     };
 
     const animateTransition = (wasCorrect: boolean) => {
-        // 1. Mevcut kartı sola kaydır
         contentTranslateX.value = withTiming(-width, { duration: 250 }, () => {
-            // Animasyon bitince JS thread'inde state güncelle
             runOnJS(nextCardLogic)(wasCorrect);
         });
         contentOpacity.value = withTiming(0, { duration: 250 });
@@ -169,27 +196,22 @@ export default function MultipleChoiceScreen() {
         setQueue(prev => {
             const [current, ...rest] = prev;
             if (wasCorrect) {
-                // Doğruysa çıkar
                 if (rest.length === 0) {
                     setGameOver(true);
                     return [];
                 }
                 return rest;
             } else {
-                // Yanlışsa sona at
                 return [...rest, { ...current, isRetry: true }];
             }
         });
 
-        // UI Durumlarını Sıfırla
         setSelectedOptionIndex(null);
         setIsProcessing(false);
 
-        // 2. Yeni kartı sağdan getir (Reset pozisyonu)
         contentTranslateX.value = width;
         contentOpacity.value = 0;
 
-        // 3. İçeri kaydır
         contentTranslateX.value = withTiming(0, { duration: 300 });
         contentOpacity.value = withTiming(1, { duration: 300 });
     };
@@ -203,12 +225,10 @@ export default function MultipleChoiceScreen() {
         setMistakeSet(new Set());
         loadGameData();
 
-        // Animasyon değerlerini sıfırla
         contentTranslateX.value = 0;
         contentOpacity.value = 1;
     };
 
-    // --- STYLES & ANIMATION ---
     const animatedContentStyle = useAnimatedStyle(() => ({
         transform: [{ translateX: contentTranslateX.value }],
         opacity: contentOpacity.value,
@@ -222,27 +242,25 @@ export default function MultipleChoiceScreen() {
         return Math.round((correctFirstTry / totalInitialCards) * 100);
     };
 
-    // --- RENDER HELPERS ---
-
-    if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#2196F3" /></View>;
+    if (loading) return <View style={[styles.center, { backgroundColor: colors.background }]}><ActivityIndicator size="large" color="#2196F3" /></View>;
 
     if (gameOver) {
         const accuracy = calculateAccuracy();
         return (
-            <View style={styles.resultContainer}>
+            <View style={[styles.resultContainer, { backgroundColor: colors.resultBg }]}>
                 <Ionicons name="trophy" size={100} color="#FFD700" style={styles.trophyIcon} />
-                <Text style={styles.resultTitle}>Test Tamamlandı!</Text>
+                <Text style={[styles.resultTitle, { color: colors.text }]}>Test Tamamlandı!</Text>
 
                 <View style={styles.statsGrid}>
-                    <View style={styles.statItem}>
+                    <View style={[styles.statItem, { backgroundColor: colors.statItemBg }]}>
                         <Text style={styles.statLabel}>Toplam Puan</Text>
-                        <Text style={styles.statValue}>{score}</Text>
+                        <Text style={[styles.statValue, { color: colors.text }]}>{score}</Text>
                     </View>
-                    <View style={styles.statItem}>
+                    <View style={[styles.statItem, { backgroundColor: colors.statItemBg }]}>
                         <Text style={styles.statLabel}>Max Kombo</Text>
-                        <Text style={styles.statValue}>🔥 {maxStreak}</Text>
+                        <Text style={[styles.statValue, { color: colors.text }]}>🔥 {maxStreak}</Text>
                     </View>
-                    <View style={styles.statItemFull}>
+                    <View style={[styles.statItemFull, { backgroundColor: colors.statItemFullBg }]}>
                         <Text style={styles.statLabel}>Ustalık Yüzdesi</Text>
                         <Text style={[styles.statValue, { color: accuracy > 80 ? '#4CAF50' : '#FF9800' }]}>
                             %{accuracy}
@@ -256,8 +274,8 @@ export default function MultipleChoiceScreen() {
                         <Text style={styles.playAgainText}>Tekrar Oyna</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.exitBtn} onPress={() => router.back()}>
-                        <Text style={styles.exitBtnText}>Listeye Dön</Text>
+                    <TouchableOpacity style={[styles.exitBtn, { backgroundColor: colors.exitBtnBg, borderColor: colors.exitBtnBorder }]} onPress={() => router.back()}>
+                        <Text style={[styles.exitBtnText, { color: colors.exitBtnText }]}>Listeye Dön</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -270,29 +288,37 @@ export default function MultipleChoiceScreen() {
     const progressPercent = totalInitialCards > 0 ? ((currentCardNumber) / totalInitialCards) * 100 : 0;
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             {/* HEADER */}
             <View style={styles.headerContainer}>
                 <View style={styles.topBar}>
-                    <View style={styles.progressTextContainer}>
-                        <Text style={styles.progressLabel}>
+                    <View style={[styles.progressTextContainer, { backgroundColor: colors.progressBg }]}>
+                        <Text style={[styles.progressLabel, { color: colors.progressText }]}>
                             {currentCardNumber} / {totalInitialCards}
                         </Text>
                     </View>
 
                     <View style={styles.scoreWrapper}>
-                        <View style={[styles.fireContainer, currentStreak === 0 && styles.fireContainerInactive]}>
-                            <Text style={[styles.fireText, currentStreak === 0 && styles.fireTextInactive]}>
+                        <View style={[
+                            styles.fireContainer, 
+                            { backgroundColor: colors.fireBg, borderColor: colors.fireBorder },
+                            currentStreak === 0 && { backgroundColor: isDark ? '#222' : '#F5F5F5', borderColor: isDark ? '#333' : '#E0E0E0' }
+                        ]}>
+                            <Text style={[
+                                styles.fireText, 
+                                { color: colors.fireText },
+                                currentStreak === 0 && { color: isDark ? '#555' : '#BDBDBD' }
+                            ]}>
                                 🔥 {currentStreak}
                             </Text>
                         </View>
-                        <View style={styles.scoreContainer}>
-                            <Text style={styles.scoreTextSmall}>{score}</Text>
+                        <View style={[styles.scoreContainer, { backgroundColor: colors.scoreBg }]}>
+                            <Text style={[styles.scoreTextSmall, { color: colors.scoreText }]}>{score}</Text>
                         </View>
                     </View>
                 </View>
 
-                <View style={styles.progressBarBackground}>
+                <View style={[styles.progressBarBackground, { backgroundColor: colors.progressBarBg }]}>
                     <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
                 </View>
             </View>
@@ -302,8 +328,8 @@ export default function MultipleChoiceScreen() {
                 {activeCard && (
                     <Animated.View style={animatedContentStyle}>
 
-                        {/* SORU KARTI (Üst Kısım) */}
-                        <View style={styles.questionCard}>
+                        {/* SORU KARTI */}
+                        <View style={[styles.questionCard, { backgroundColor: colors.cardBg, borderColor: colors.border, borderWidth: 1 }]}>
                             {activeCard.isRetry && (
                                 <View style={styles.retryBadge}>
                                     <Ionicons name="refresh" size={14} color="#D32F2F" />
@@ -311,65 +337,59 @@ export default function MultipleChoiceScreen() {
                                 </View>
                             )}
 
-                            {/* Opsiyonel Resim */}
                             {activeCard.front_image ? (
-                                <View style={styles.imageContainer}>
+                                <View style={[styles.imageContainer, { backgroundColor: colors.imageBg }]}>
                                     <Image source={{ uri: activeCard.front_image }} style={styles.mainImage} resizeMode="cover" />
                                 </View>
                             ) : (
-                                // Resim yoksa ikon gösterelim ki boş durmasın
                                 <View style={{ height: 10 }} />
                             )}
 
                             <Text style={styles.boxLabel}>Terim</Text>
-                            <Text style={styles.questionText}>{activeCard.front_word}</Text>
+                            <Text style={[styles.questionText, { color: colors.text }]}>{activeCard.front_word}</Text>
                         </View>
 
-                        {/* CEVAP ŞIKLARI (Alt Kısım) */}
+                        {/* CEVAP ŞIKLARI */}
                         <View style={styles.optionsContainer}>
                             {activeCard.options.map((option, index) => {
 
-                                // --- BUTON STİLLERİ ---
                                 const baseButtonStyle = styles.optionButton;
                                 let dynamicButtonStyle = {};
+                                
+                                // Base Style'a tema renklerini ekle
+                                const themeStyle = { backgroundColor: colors.optionBg, borderColor: colors.optionBorder };
 
-                                // --- METİN STİLLERİ ---
-                                // 1. Temel metin stili her zaman sabit
                                 const baseTextStyle = styles.optionText;
-                                // 2. Değişken metin stili (sadece gerektiğinde dolacak)
-                                let dynamicTextStyle = {};
+                                // Base Text'e tema rengini ekle
+                                let dynamicTextStyle = { color: colors.optionText };
 
                                 let iconName = null;
 
                                 if (selectedOptionIndex !== null) {
-                                    // Kullanıcı seçim yaptıysa:
                                     if (index === activeCard.correctOptionIndex) {
-                                        // Doğru Şık: Yeşil buton, Beyaz kalın yazı
+                                        // Doğru Şık
                                         dynamicButtonStyle = styles.optionButtonCorrect;
-                                        dynamicTextStyle = styles.optionTextLight;
+                                        dynamicTextStyle = styles.optionTextLight; // Beyaz yazı
                                         iconName = "checkmark-circle";
                                     } else if (index === selectedOptionIndex) {
-                                        // Yanlış Seçilen Şık: Kırmızı buton, Beyaz kalın yazı
+                                        // Yanlış Seçilen
                                         dynamicButtonStyle = styles.optionButtonWrong;
-                                        dynamicTextStyle = styles.optionTextLight;
+                                        dynamicTextStyle = styles.optionTextLight; // Beyaz yazı
                                         iconName = "close-circle";
                                     } else {
-                                        // Diğerleri: Silik buton
-                                        dynamicButtonStyle = styles.optionButtonDimmed;
+                                        // Diğerleri
+                                        dynamicButtonStyle = { backgroundColor: colors.optionDimmedBg, borderColor: colors.border, opacity: 0.6 };
                                     }
                                 }
 
                                 return (
                                     <TouchableOpacity
                                         key={index}
-                                        // Buton stilini birleştiriyoruz
-                                        style={[baseButtonStyle, dynamicButtonStyle]}
+                                        style={[baseButtonStyle, themeStyle, dynamicButtonStyle]}
                                         onPress={() => handleOptionSelect(index)}
                                         disabled={isProcessing}
                                         activeOpacity={0.9}
                                     >
-                                        {/* HATA ÇÖZÜMÜ BURADA: */}
-                                        {/* Metin stilini de dizi içinde birleştiriyoruz [Temel, Dinamik] */}
                                         <Text style={[baseTextStyle, dynamicTextStyle]} numberOfLines={2}>
                                             {option}
                                         </Text>
@@ -390,22 +410,20 @@ export default function MultipleChoiceScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F5F7FA', paddingTop: 50 },
+    container: { flex: 1, paddingTop: 50 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
     // HEADER
     headerContainer: { paddingHorizontal: 24, marginBottom: 10, height: 80 },
     topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-    progressTextContainer: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, elevation: 1 },
-    progressLabel: { fontSize: 16, fontWeight: 'bold', color: '#555' },
+    progressTextContainer: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, elevation: 1 },
+    progressLabel: { fontSize: 16, fontWeight: 'bold' },
     scoreWrapper: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    fireContainer: { backgroundColor: '#FFF3E0', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: '#FFE0B2' },
-    fireText: { color: '#FF9800', fontWeight: 'bold', fontSize: 14 },
-    fireContainerInactive: { backgroundColor: '#F5F5F5', borderColor: '#E0E0E0' },
-    fireTextInactive: { color: '#BDBDBD' },
-    scoreContainer: { backgroundColor: '#E3F2FD', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
-    scoreTextSmall: { color: '#2196F3', fontWeight: 'bold', fontSize: 16 },
-    progressBarBackground: { height: 6, backgroundColor: '#E0E0E0', borderRadius: 3, overflow: 'hidden' },
+    fireContainer: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1 },
+    fireText: { fontWeight: 'bold', fontSize: 14 },
+    scoreContainer: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
+    scoreTextSmall: { fontWeight: 'bold', fontSize: 16 },
+    progressBarBackground: { height: 6, borderRadius: 3, overflow: 'hidden' },
     progressBarFill: { height: '100%', backgroundColor: '#4CAF50', borderRadius: 3 },
 
     // GAME WRAPPER
@@ -413,15 +431,14 @@ const styles = StyleSheet.create({
 
     // QUESTION CARD
     questionCard: {
-        backgroundColor: '#fff',
         borderRadius: 24,
         padding: 20,
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 4,
         marginBottom: 25,
-        minHeight: 200, // Sabit bir minimum yükseklik
-        flex: 0.8 // Ekranın üst kısmını kaplasın
+        minHeight: 200, 
+        flex: 0.8 
     },
     retryBadge: {
         position: 'absolute', top: 15, right: 15, flexDirection: 'row', alignItems: 'center',
@@ -433,10 +450,9 @@ const styles = StyleSheet.create({
         width: '100%', height: 150, borderRadius: 12, marginBottom: 15, overflow: 'hidden'
     },
     mainImage: { width: '100%', height: '100%' },
-    iconContainer: { marginBottom: 10, backgroundColor: '#E3F2FD', padding: 15, borderRadius: 50 },
 
     boxLabel: { fontSize: 12, color: '#90A4AE', fontWeight: 'bold', marginBottom: 5, textTransform: 'uppercase' },
-    questionText: { fontSize: 26, fontWeight: 'bold', color: '#263238', textAlign: 'center' },
+    questionText: { fontSize: 26, fontWeight: 'bold', textAlign: 'center' },
 
     // OPTIONS AREA
     optionsContainer: {
@@ -445,12 +461,10 @@ const styles = StyleSheet.create({
         marginBottom: 20
     },
     optionButton: {
-        backgroundColor: '#fff',
         paddingVertical: 16,
         paddingHorizontal: 20,
         borderRadius: 16,
         borderWidth: 2,
-        borderColor: '#ECEFF1',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -466,29 +480,24 @@ const styles = StyleSheet.create({
         borderColor: '#FF5252',
         elevation: 4
     },
-    optionButtonDimmed: {
-        backgroundColor: '#F5F5F5',
-        borderColor: '#EEEEEE',
-        opacity: 0.6
-    },
-
-    optionText: { fontSize: 18, color: '#455A64', fontWeight: '600', textAlign: 'center' },
-    optionTextLight: { fontSize: 18, color: '#fff', fontWeight: 'bold', textAlign: 'center' },
+    
+    optionText: { fontSize: 18, fontWeight: '600', textAlign: 'center' },
+    optionTextLight: { color: '#fff', fontWeight: 'bold' },
     optionIcon: { position: 'absolute', right: 20 },
 
     // RESULT SCREEN
-    resultContainer: { flex: 1, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', padding: 30 },
+    resultContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30 },
     trophyIcon: { marginBottom: 20 },
-    resultTitle: { fontSize: 32, fontWeight: 'bold', color: '#333', marginBottom: 30 },
+    resultTitle: { fontSize: 32, fontWeight: 'bold', marginBottom: 30 },
     statsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', width: '100%', marginBottom: 40 },
-    statItem: { width: '48%', backgroundColor: '#F5F7FA', padding: 20, borderRadius: 16, alignItems: 'center', marginBottom: 15 },
-    statItemFull: { width: '100%', backgroundColor: '#E8F5E9', padding: 20, borderRadius: 16, alignItems: 'center' },
+    statItem: { width: '48%', padding: 20, borderRadius: 16, alignItems: 'center', marginBottom: 15 },
+    statItemFull: { width: '100%', padding: 20, borderRadius: 16, alignItems: 'center' },
     statLabel: { fontSize: 14, color: '#666', marginBottom: 8 },
-    statValue: { fontSize: 24, fontWeight: 'bold', color: '#333' },
+    statValue: { fontSize: 24, fontWeight: 'bold' },
 
     resultButtons: { width: '100%', gap: 15 },
     playAgainBtn: { backgroundColor: '#2196F3', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 18, borderRadius: 16 },
     playAgainText: { color: 'white', fontSize: 18, fontWeight: 'bold', marginLeft: 10 },
-    exitBtn: { backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', padding: 18, borderRadius: 16, borderWidth: 2, borderColor: '#eee' },
-    exitBtnText: { color: '#666', fontSize: 16, fontWeight: 'bold' }
+    exitBtn: { alignItems: 'center', justifyContent: 'center', padding: 18, borderRadius: 16, borderWidth: 2 },
+    exitBtnText: { fontSize: 16, fontWeight: 'bold' }
 });

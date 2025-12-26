@@ -1,11 +1,11 @@
 // --- VERİ MODELLERİ ---
 
 export type PracticeMode = 
-  | 'classic'          // Flashcard (Hafıza)
-  | 'match'            // Eşleştirme (Refleks)
-  | 'write'          // Yazma (Yazım/İmla) - Önceden 'write' idi
-  | 'truefalse'       // Doğru/Yanlış (Karar) - Önceden 'truefalse' idi
-  | 'multiple'; // Çoktan Seçmeli (Analiz) - Önceden 'multiple' idi
+  | 'classic'          
+  | 'match'            
+  | 'write'          
+  | 'truefalse'       
+  | 'multiple'; 
 
 export interface Card {
   id: number;
@@ -20,9 +20,9 @@ export interface Card {
 
   // SRS (Spaced Repetition) Verileri
   box: number;          // Kutusu (1-5 arası)
-  interval: number;      // Gün cinsinden tekrar aralığı
-  easeFactor: number;    // Zorluk katsayısı (Min 1.3, Başlangıç 2.5)
-  nextReview: string | null; // ISOString tarihi (null ise yeni karttır)
+  interval: number;      
+  easeFactor: number;    
+  nextReview: string | null; 
 }
 
 export interface Deck {

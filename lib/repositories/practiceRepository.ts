@@ -12,7 +12,6 @@ export const createPractice = async (
   mode: PracticeMode = "classic" // Varsayılan mod: classic
 ): Promise<Practice | null> => {
 
-  // DÜZELTME: SQL sorgusuna 'mode' sütunu eklendi
   const query = `
     INSERT INTO practices (deck_id, date, duration, correct_count, wrong_count,mode) 
     VALUES (?, ?, ?, ?, ?, ?);
@@ -76,7 +75,7 @@ export const getPracticesByDeckId = async (deck_id: number): Promise<Practice[]>
   }
 };
 
-// Pratik kaydı güncelleme (Mod genellikle güncellenmez, o yüzden eklemedik)
+// Pratik kaydı güncelleme (Mod genellikle güncellenmez)
 export const updatePractice = async (
   id: number, 
   duration: number, 

@@ -1,11 +1,11 @@
 import { Card } from '../types';
 
 /**
- * SuperMemo-2 (SM-2) varyasyonu SRS algoritması.
+ * 
  * * @param card - İşlenecek kart objesi
  * @param quality - Kullanıcının verdiği cevap kalitesi (0-5 arası)
  * MindFlip'te: 1: Zor, 3: Normal, 5: Kolay
- * @returns Güncellenmiş interval, easeFactor ve nextReview tarihi
+ * @returns
  */
 export const calculateNextReview = (card: Card, quality: number) => {
   // Veritabanından gelen değerler veya varsayılanlar

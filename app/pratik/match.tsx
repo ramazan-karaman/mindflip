@@ -15,6 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as CardRepository from '../../lib/repositories/cardRepository';
 import { savePracticeSession } from '../../lib/services/practiceService';
+import { useTheme } from '../../lib/ThemeContext';
 import { Card } from '../../lib/types';
 
 const { width, height } = Dimensions.get('window');
@@ -38,13 +39,15 @@ const CardComponent = React.memo(({
     isSelected, 
     isWrong, 
     cardHeight,
-    onPress 
+    onPress ,
+    colors
 }: { 
     item: MatchItem, 
     isSelected: boolean, 
     isWrong: boolean, 
     cardHeight: number,
-    onPress: (item: MatchItem) => void 
+    onPress: (item: MatchItem) => void ,
+    colors: any
 }) => {
     
     const offset = useSharedValue(0);
@@ -64,18 +67,18 @@ const CardComponent = React.memo(({
     }));
 
     // Stiller
-    const baseCardStyle = { ...styles.card, height: cardHeight };
-    const baseTextStyle = styles.cardText;
+    const baseCardStyle = { ...styles.card, height: cardHeight,backgroundColor: colors.cardBg, borderColor: colors.border };
+    const baseTextStyle = { ...styles.cardText, color: colors.text };
 
     let dynamicCardStyle = {};
     let dynamicTextStyle = {};
 
     if (isWrong) {
-        dynamicCardStyle = styles.cardWrong;
-        dynamicTextStyle = styles.cardTextWrong;
+        dynamicCardStyle = { backgroundColor: colors.wrongBg, borderColor: colors.wrongBorder };
+        dynamicTextStyle = { ...styles.cardTextWrong, color: colors.wrongText };
     } else if (isSelected) {
-        dynamicCardStyle = styles.cardSelected;
-        dynamicTextStyle = styles.cardTextSelected;
+        dynamicCardStyle = { backgroundColor: colors.selectedBg, borderColor: colors.selectedBorder };
+        dynamicTextStyle = { ...styles.cardTextSelected, color: colors.selectedText };
     }
 
     // Eşleşen kart (Boşluk)
@@ -114,6 +117,49 @@ const CardComponent = React.memo(({
 export default function MatchScreen() {
     const { deckId } = useLocalSearchParams<{ deckId: string }>();
     const router = useRouter();
+
+    const { isDark } = useTheme();
+
+    const colors = {
+        background: isDark ? '#000000' : '#F5F7FA',
+        cardBg: isDark ? '#1C1C1E' : '#ffffff',
+        text: isDark ? '#ffffff' : '#455A64',
+        border: isDark ? '#333333' : '#ECEFF1',
+        
+        // Kart Durumları
+        selectedBg: isDark ? '#0D47A1' : '#E3F2FD',
+        selectedBorder: isDark ? '#1976D2' : '#2196F3',
+        selectedText: isDark ? '#BBDEFB' : '#1565C0',
+        
+        wrongBg: isDark ? '#3E2723' : '#FFEBEE',
+        wrongBorder: isDark ? '#D32F2F' : '#FF5252',
+        wrongText: isDark ? '#FFCDD2' : '#D32F2F',
+
+        // Header Elemanları
+        timerBadgeBg: isDark ? '#1C1C1E' : '#ffffff',
+        timerText: isDark ? '#aaa' : '#555',
+        timerDangerBg: isDark ? '#3E2723' : '#FFEBEE',
+        timerDangerBorder: isDark ? '#D32F2F' : '#EF9A9A',
+        
+        streakBg: isDark ? '#3E2723' : '#FFF3E0',
+        streakBorder: isDark ? '#5D4037' : '#FFE0B2',
+        scoreBg: isDark ? '#0D47A1' : '#E3F2FD',
+        
+        progressBarBg: isDark ? '#333' : '#E0E0E0',
+
+        // Modal
+        modalOverlay: 'rgba(0,0,0,0.6)',
+        modalContent: isDark ? '#1C1C1E' : '#ffffff',
+        modalText: isDark ? '#ffffff' : '#333333',
+
+        // Sonuç Ekranı
+        resultBg: isDark ? '#000000' : '#ffffff',
+        statItemBg: isDark ? '#1C1C1E' : '#F5F7FA',
+        statItemFullBg: isDark ? '#1B5E20' : '#E8F5E9',
+        exitBtnBg: isDark ? '#000000' : '#ffffff',
+        exitBtnBorder: isDark ? '#333' : '#eee',
+        exitBtnText: isDark ? '#ccc' : '#666',
+    }
 
     // --- DATA ---
     const [allPairs, setAllPairs] = useState<Card[]>([]);
@@ -345,26 +391,26 @@ export default function MatchScreen() {
     if (timerProgress < 0.5) timerColor = '#FFC107'; // Sarı
     if (timerProgress < 0.2) timerColor = '#F44336'; // Kırmızı
 
-    if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#2196F3" /></View>;
+    if (loading) return <View style={[styles.center, { backgroundColor: colors.background }]}><ActivityIndicator size="large" color="#2196F3" /></View>;
 
     if (gameOver) {
         const accuracy = calculateAccuracy();
         const isSuccess = endModalType === 'success';
         return (
-            <View style={styles.resultContainer}>
+            <View style={[styles.resultContainer, { backgroundColor: colors.resultBg }]}>
                 <Ionicons name={isSuccess ? "trophy" : "hourglass"} size={100} color={isSuccess ? "#FFD700" : "#FF9800"} style={styles.trophyIcon} />
-                <Text style={styles.resultTitle}>{isSuccess ? "Oyun Tamamlandı!" : "Süre Doldu!"}</Text>
+                <Text style={[styles.resultTitle, { color: colors.text }]}>{isSuccess ? "Oyun Tamamlandı!" : "Süre Doldu!"}</Text>
                 
                 <View style={styles.statsGrid}>
-                    <View style={styles.statItem}>
+                    <View style={[styles.statItem, { backgroundColor: colors.statItemBg }]}>
                         <Text style={styles.statLabel}>Puan</Text>
-                        <Text style={styles.statValue}>{score}</Text>
+                        <Text style={[styles.statValue, { color: colors.text }]}>{score}</Text>
                     </View>
-                    <View style={styles.statItem}>
+                    <View style={[styles.statItem, { backgroundColor: colors.statItemBg }]}>
                         <Text style={styles.statLabel}>Max Kombo</Text>
-                        <Text style={styles.statValue}>🔥 {maxStreak}</Text>
+                        <Text style={[styles.statValue, { color: colors.text }]}>🔥 {maxStreak}</Text>
                     </View>
-                    <View style={styles.statItemFull}>
+                    <View style={[styles.statItemFull, { backgroundColor: colors.statItemBg }]}>
                         <Text style={styles.statLabel}>Doğruluk</Text>
                         <Text style={[styles.statValue, {color: accuracy > 80 ? '#4CAF50' : '#FF9800'}]}>
                             %{accuracy}
@@ -378,8 +424,8 @@ export default function MatchScreen() {
                         <Text style={styles.playAgainText}>Tekrar Oyna</Text>
                     </TouchableOpacity>
                     
-                    <TouchableOpacity style={styles.exitBtn} onPress={() => router.back()}>
-                        <Text style={styles.exitBtnText}>Listeye Dön</Text>
+                    <TouchableOpacity style={[styles.exitBtn, { backgroundColor: colors.exitBtnBg, borderColor: colors.exitBtnBorder }]} onPress={() => router.back()}>
+                        <Text style={[styles.exitBtnText, { color: colors.exitBtnText }]}>Listeye Dön</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -387,19 +433,19 @@ export default function MatchScreen() {
     }
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <View style={styles.container}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+            <View style={[styles.container, { backgroundColor: colors.background }]}>
                 
                 {/* GEÇİŞ MODALI (Tampon Bölge) */}
                 <Modal visible={showEndModal} transparent animationType="fade">
-                    <View style={styles.modalOverlay}>
-                        <View style={styles.modalContent}>
+                    <View style={[styles.modalOverlay, { backgroundColor: colors.modalOverlay }]}>
+                        <View style={[styles.modalContent, { backgroundColor: colors.modalContent }]}>
                             <Ionicons 
                                 name={endModalType === 'success' ? "checkmark-circle" : "alarm"} 
                                 size={80} 
                                 color={endModalType === 'success' ? "#4CAF50" : "#F44336"} 
                             />
-                            <Text style={styles.modalText}>
+                            <Text style={[styles.modalText, { color: colors.modalText }]}>
                                 {endModalType === 'success' ? "Bölüm Bitti!" : "Süre Doldu!"}
                             </Text>
                         </View>
@@ -409,33 +455,41 @@ export default function MatchScreen() {
                 {/* HEADER */}
                 <View style={styles.header}>
                     {/* Sol: Süre Sayacı */}
-                    <View style={[styles.timerBadge, timeLeft < 10 && styles.timerBadgeDanger]}>
+                    <View style={[
+                        styles.timerBadge, 
+                        { backgroundColor: colors.timerBadgeBg },
+                        timeLeft < 10 && { backgroundColor: colors.timerDangerBg, borderColor: colors.timerDangerBorder }
+                    ]}>
                         <Ionicons name="time-outline" size={20} color={timeLeft < 10 ? "#D32F2F" : "#555"} />
-                        <Text style={[styles.timerText, timeLeft < 10 && styles.timerTextDanger]}>
+                        <Text style={[styles.timerText, { color: colors.timerText }, timeLeft < 10 && styles.timerTextDanger]}>
                             {formatTime(timeLeft)}
                         </Text>
                     </View>
 
                     {/* Orta: İlerleme */}
-                    <Text style={styles.progressText}>
+                    <Text style={[styles.progressText, { color: colors.text }]}>
                         { (allPairs.length * 2) - (currentPairIndex * 2) - currentRoundItems.filter(i => i.isMatched).length } / {allPairs.length * 2}
                     </Text>
                     
                     {/* Sağ: Kombo & Skor */}
                     <View style={styles.scoreWrapper}>
-                        <View style={[styles.streakContainer, currentStreak === 0 && styles.streakInactive]}>
+                        <View style={[
+                            styles.streakContainer, 
+                            { backgroundColor: colors.streakBg, borderColor: colors.streakBorder },
+                            currentStreak === 0 && styles.streakInactive
+                        ]}>
                             <Text style={[styles.streakText, currentStreak === 0 && styles.streakTextInactive]}>
                                 🔥 {currentStreak}
                             </Text>
                         </View>
-                        <View style={styles.scoreContainer}>
+                        <View style={[styles.scoreContainer, { backgroundColor: colors.scoreBg }]}>
                             <Text style={styles.scoreText}>{score}</Text>
                         </View>
                     </View>
                 </View>
 
                 {/* ZAMAN ÇUBUĞU (Visual Timer) */}
-                <View style={styles.timerBarContainer}>
+                <View style={[styles.timerBarContainer, { backgroundColor: colors.progressBarBg }]}>
                     <View style={[
                         styles.timerBarFill, 
                         { width: `${timerProgress * 100}%`, backgroundColor: timerColor }
@@ -452,6 +506,7 @@ export default function MatchScreen() {
                             isSelected={selectedItem?.id === item.id}
                             isWrong={wrongPairIds.includes(item.id)}
                             onPress={handleCardPress}
+                            colors={colors}
                         />
                     ))}
                 </View>
@@ -557,6 +612,3 @@ const styles = StyleSheet.create({
     exitBtnText: { color: '#666', fontSize: 16, fontWeight: 'bold' }
 });
 
-//MatchScreen içinde state yönetimi biraz karışık (allPairs, currentRoundItems vb.). Oyun mantığını useMatchGame gibi bir Custom Hook içine alırsan Screen dosyan sadece render işiyle uğraşır, çok daha temiz olur.
-
-//useWindowDimensions() gibi hooklarla boyutları dinamik alabilirsin. Böylece orientation değişimlerinde de uyumlu olur. kontrol edilecek

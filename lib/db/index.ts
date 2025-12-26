@@ -35,7 +35,6 @@ export const initializeDatabase = async () => {
     // 3. TABLO OLUŞTURMA (Schema Creation)
 
     // --- A. DESTELER (DECKS) ---
-    // 'name' -> 'title' olarak güncellendi (Types.ts uyumu için)
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS decks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,7 +70,6 @@ export const initializeDatabase = async () => {
     `);
 
     // --- C. PRATİK GEÇMİŞİ (PRACTICES) ---
-    // 'success_rate' kaldırıldı. Yerine net veriler geldi.
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS practices (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -106,5 +104,23 @@ export const initializeDatabase = async () => {
     console.log("Veritabanı (V2 - Clean Architecture) başarıyla oluşturuldu.");
   } catch (error) {
     console.error("Veritabanı başlatılırken kritik hata:", error);
+  }
+};
+
+export const clearDatabase = async () => {
+  try {
+    // Tüm tabloları sırasıyla boşaltıyoruz (DROP etmiyoruz, truncate ediyoruz)
+    await db.execAsync('DELETE FROM cards');
+    await db.execAsync('DELETE FROM decks');
+    
+    // Auto-increment sayaçlarını sıfırla (Opsiyonel ama temiz olur)
+    await db.execAsync('DELETE FROM sqlite_sequence WHERE name="cards"');
+    await db.execAsync('DELETE FROM sqlite_sequence WHERE name="decks"');
+    
+    console.log("Veritabanı başarıyla temizlendi.");
+    return true;
+  } catch (error) {
+    console.error("Veritabanı temizlenirken hata:", error);
+    return false;
   }
 };

@@ -20,13 +20,12 @@ import {
 } from 'react-native';
 import { Menu, MenuOption, MenuOptions, MenuTrigger } from 'react-native-popup-menu';
 
-// --- MODERN KÜTÜPHANELER ---
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system'; // Modern File API
 import { useShareIntent } from 'expo-share-intent'; // YENİ: Paylaşım Yakalayıcı
 import * as Sharing from 'expo-sharing';
+import { useTheme } from '../../lib/ThemeContext';
 
-// --- BİLEŞENLER VE REPOLAR ---
 import ExpandableFab from '../../components/ExpandableFab';
 import * as CardRepository from '../../lib/repositories/cardRepository';
 import * as DeckRepository from '../../lib/repositories/deckRepository';
@@ -38,12 +37,25 @@ export default function IndexScreen() {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
 
-  // --- SHARE INTENT HOOK (YENİ ÖZELLİK) ---
+  const {isDark} = useTheme();
+
+  const colors = {
+    background: isDark ? '#000000' : '#f7f7f7',
+    card: isDark ? '#1C1C1E' : '#ffffff',
+    text: isDark ? '#ffffff' : '#333333',
+    subText: isDark ? '#aaaaaa' : '#666666',
+    border: isDark ? '#333333' : '#dddddd',
+    inputBg: isDark ? '#2C2C2E' : '#f0f0f0',
+    icon: isDark ? '#ffffff' : '#333333',
+    menuBg: isDark ? '#2C2C2E' : '#ffffff',
+    modalOverlay: 'rgba(0,0,0,0.6)',
+    accent: '#2196F3'
+  };
+
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
 
   const [search, setSearch] = useState('');
   
-  // Modallar
   const [showSheet, setShowSheet] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [isGoalModalVisible, setIsGoalModalVisible] = useState(false);
@@ -54,7 +66,6 @@ export default function IndexScreen() {
 
   const [newDeck, setNewDeck] = useState({ name: '', description: '' });
 
-  // CSV Import State
   const [importDeckName, setImportDeckName] = useState('');
   const [parsedCards, setParsedCards] = useState<{front: string, back: string}[]>([]);
   const [previewCards, setPreviewCards] = useState<{front: string, back: string}[]>([]);
@@ -71,14 +82,11 @@ export default function IndexScreen() {
 
   // --- 1. PAYLAŞIM YAKALAMA MANTIĞI ---
   useEffect(() => {
-    // Eğer bir paylaşım varsa ve bu bir dosya ise
     if (hasShareIntent && (shareIntent.type === 'file' || shareIntent.type === 'text')) {
       console.log("Paylaşım Tespit Edildi:", shareIntent);
 
-      // Dosya var mı?
       if (shareIntent.files && shareIntent.files.length > 0) {
         const sharedFile = shareIntent.files[0];
-        // sharedFile.path -> Dosyanın cihazdaki yolu (file:// veya content://)
         handleExternalFile(sharedFile.path, sharedFile.fileName || "Paylaşılan Deste");
       } 
       // Bazen text olarak gelir (Nadir CSV durumları)
@@ -90,7 +98,6 @@ export default function IndexScreen() {
          processCsvContent((shareIntent as any).text, "Paylaşılan Metin");
       }
 
-      // İşlem bitince intent'i temizle ki döngüye girmesin
       resetShareIntent();
     }
   }, [hasShareIntent, shareIntent, resetShareIntent]);
@@ -100,10 +107,8 @@ export default function IndexScreen() {
     try {
       console.log("Dosya okunuyor:", uri);
       
-      // Dosya adını temizle (.csv uzantısını at)
       const cleanName = fileName.replace(/\.(csv|txt)$/i, '');
 
-      // Modern API ile oku
       const file = new File(uri);
       const content = await file.text(); // İçeriği string olarak al
 
@@ -116,7 +121,7 @@ export default function IndexScreen() {
     }
   };
 
-  // --- 3. CSV İŞLEME MANTIĞI (ORTAK) ---
+  // --- 3. CSV İŞLEME MANTIĞI ---
   const processCsvContent = (content: string, defaultName: string) => {
     const rows = content.split(/\r\n|\n|\r/);
     const cards: {front: string, back: string}[] = [];
@@ -165,7 +170,6 @@ export default function IndexScreen() {
       const fileUri = result.assets[0].uri;
       const fileName = result.assets[0].name; // handleExternalFile içinde temizlenecek
 
-      // Ortak fonksiyonu kullan
       handleExternalFile(fileUri, fileName);
 
     } catch (err) {
@@ -293,24 +297,24 @@ export default function IndexScreen() {
   const filteredDecks = decks?.filter((d) => d.name.toLowerCase().includes(search.toLowerCase())) ?? [];
 
   const renderDeck = ({ item }: { item: DeckWithCardCount }) => (
-    <View style={styles.deckCard}>
+    <View style={[styles.deckCard, { backgroundColor: colors.card }]}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={styles.deckTitle}>{item.name} {(item.goal ?? 0) > 0 && `(Hedef: ${item.goal})`}</Text>
+        <Text style={[styles.deckTitle, { color: colors.text }]}>{item.name} {(item.goal ?? 0) > 0 && `(Hedef: ${item.goal})`}</Text>
         
         <Menu>
           <MenuTrigger>
              <View style={{padding: 5}}>
-                <Ionicons name="ellipsis-vertical" size={20} color="#333" />
+                <Ionicons name="ellipsis-vertical" size={20} color={colors.text} />
              </View>
           </MenuTrigger>
-          <MenuOptions customStyles={{ optionsContainer: { borderRadius: 10, padding: 5, width: 160 } }}>
+          <MenuOptions customStyles={{ optionsContainer: { borderRadius: 10, padding: 5, width: 160, backgroundColor: colors.menuBg } }}>
             <MenuOption onSelect={() => router.push(`/editDeck?deckId=${item.id}`)} style={styles.menuItem}>
-                <Ionicons name="create-outline" size={18} color="#333" />
-                <Text style={styles.menuText}>Düzenle</Text>
+                <Ionicons name="create-outline" size={18} color={colors.text} />
+                <Text style={[styles.menuText, { color: colors.text }]}>Düzenle</Text>
             </MenuOption>
             <MenuOption onSelect={() => handleOpenGoalSheet(item)} style={styles.menuItem}>
-                <Ionicons name="flag-outline" size={18} color="#333" />
-                <Text style={styles.menuText}>Hedef Belirle</Text>
+                <Ionicons name="flag-outline" size={18} color={colors.text} />
+                <Text style={[styles.menuText, { color: colors.text }]}>Hedef Belirle</Text>
             </MenuOption>
             <MenuOption onSelect={() => handleExportDeck(item)} style={styles.menuItem}>
                 <Ionicons name="share-social-outline" size={18} color="#2196F3" />
@@ -324,10 +328,10 @@ export default function IndexScreen() {
           </MenuOptions>
         </Menu>
       </View>
-      <Text style={styles.deckDesc}>{item.description}</Text>
+      <Text style={[styles.deckDesc, { color: colors.subText }]}>{item.description}</Text>
       <View style={styles.deckStats}>
-        <Ionicons name="albums-outline" size={16} color="#666" />
-        <Text style={styles.deckStatsText}>{item.cardCount} Kart</Text>
+        <Ionicons name="albums-outline" size={16} color={colors.subText} />
+        <Text style={[styles.deckStatsText, { color: colors.text }]}>{item.cardCount} Kart</Text>
       </View>
       <View style={styles.deckButtons}>
         <TouchableOpacity style={styles.practiceBtn} onPress={() => router.push(`/practice?deckId=${item.id}`)}>
@@ -341,17 +345,17 @@ export default function IndexScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.searchRow}>
         <TouchableOpacity onPress={() => navigation.dispatch(DrawerActions.openDrawer())}>
-          <Ionicons name="menu" size={35} color="#333" />
+          <Ionicons name="menu" size={35} color={colors.icon} />
         </TouchableOpacity>
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-          <TextInput placeholder="Destelerinde Ara..." placeholderTextColor="#888" value={search} onChangeText={setSearch} style={styles.searchInput} />
+          <Ionicons name="search" size={20} color={colors.subText} style={styles.searchIcon} />
+          <TextInput placeholder="Destelerinde Ara..." placeholderTextColor={colors.subText} value={search} onChangeText={setSearch} style={[styles.searchInput, { color: colors.text }]}/>
           {search.length > 0 && (
             <TouchableOpacity onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={20} color="#ccc" />
+              <Ionicons name="close-circle" size={20} color={colors.subText} />
             </TouchableOpacity>
           )}
         </View>
@@ -362,22 +366,22 @@ export default function IndexScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ flex: 1 }}
         >
-        <View style={styles.sheetOverlay}>
-          <View style={styles.sheetContent}>
-            <Text style={styles.modalTitle}>İçe Aktarma Önizlemesi</Text>
-            <View style={styles.statsRow}>
+        <View style={[styles.sheetOverlay, { backgroundColor: colors.modalOverlay }]}>
+          <View style={[styles.sheetContent, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>İçe Aktarma Önizlemesi</Text>
+            <View style={[styles.statsRow, { backgroundColor: isDark ? '#102027' : '#E3F2FD' }]}>
                 <Ionicons name="documents-outline" size={20} color="#2196F3" />
                 <Text style={styles.statsText}>{parsedCards.length} Kart Bulundu</Text>
             </View>
-            <Text style={styles.label}>Deste Adı:</Text>
-            <TextInput value={importDeckName} onChangeText={setImportDeckName} style={styles.input} />
-            <Text style={styles.label}>Örnek (İlk 3):</Text>
-            <View style={styles.previewContainer}>
+            <Text style={[styles.label, { color: colors.subText }]}>Deste Adı:</Text>
+            <TextInput value={importDeckName} onChangeText={setImportDeckName} style={[styles.input, { borderColor: colors.border, color: colors.text }]} />
+            <Text style={[styles.label, { color: colors.subText }]}>Örnek (İlk 3):</Text>
+            <View style={[styles.previewContainer, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
                 {previewCards.map((c, i) => (
                     <View key={i} style={styles.previewRow}>
-                        <Text style={styles.previewFront} numberOfLines={1}>{c.front}</Text>
-                        <Ionicons name="arrow-forward" size={14} color="#999" />
-                        <Text style={styles.previewBack} numberOfLines={1}>{c.back}</Text>
+                        <Text style={[styles.previewFront, { color: colors.text }]} numberOfLines={1}>{c.front}</Text>
+                        <Ionicons name="arrow-forward" size={14} color={colors.subText} />
+                        <Text style={[styles.previewBack, { color: colors.subText }]} numberOfLines={1}>{c.back}</Text>
                     </View>
                 ))}
             </View>
@@ -393,13 +397,13 @@ export default function IndexScreen() {
       </Modal>
 
       <Modal visible={isGoalModalVisible} animationType="slide" transparent onRequestClose={() => setIsGoalModalVisible(false)}>
-        <View style={styles.sheetOverlay}> 
-            <View style={styles.sheetContent}>
-                <Text style={styles.modalTitle}>Hedef Belirle</Text>
-                <Text style={{ textAlign:'center', marginVertical: 20, fontSize: 18, fontWeight: 'bold' }}>
+        <View style={[styles.sheetOverlay, { backgroundColor: colors.modalOverlay }]}> 
+            <View style={[styles.sheetContent, { backgroundColor: colors.card }]}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Hedef Belirle</Text>
+                <Text style={{ textAlign:'center', marginVertical: 20, fontSize: 18, fontWeight: 'bold',color: colors.text }}>
                     Hedef: {Math.round(currentGoal)} / {maxGoal}
                 </Text>
-                <Slider style={{ width: '100%', height: 40 }} minimumValue={1} maximumValue={maxGoal} step={1} value={currentGoal} onValueChange={setCurrentGoal} minimumTrackTintColor="#2196F3" maximumTrackTintColor="#000000" />
+                <Slider style={{ width: '100%', height: 40 }} minimumValue={1} maximumValue={maxGoal} step={1} value={currentGoal} onValueChange={setCurrentGoal} minimumTrackTintColor="#2196F3" maximumTrackTintColor={colors.border} />
                 <TouchableOpacity style={styles.saveBtn} onPress={handleSaveGoal}>
                     <Text style={styles.btnText}>Kaydet</Text>
                 </TouchableOpacity>
@@ -415,11 +419,11 @@ export default function IndexScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ flex: 1 }}
         >
-        <View style={styles.sheetOverlay}>
-            <View style={styles.sheetContent}>
-                <Text style={styles.modalTitle}>Yeni Deste Oluştur</Text>
-                <TextInput placeholder="İsim" placeholderTextColor="#888" value={newDeck.name} onChangeText={(t) => setNewDeck({ ...newDeck, name: t })} style={styles.input} />
-                <TextInput placeholder="Açıklama" placeholderTextColor="#888" value={newDeck.description} onChangeText={(t) => setNewDeck({ ...newDeck, description: t })} style={styles.input} />
+        <View style={[styles.sheetOverlay, { backgroundColor: colors.modalOverlay }]}>
+            <View style={[styles.sheetContent, { backgroundColor: colors.card }]}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Yeni Deste Oluştur</Text>
+                <TextInput placeholder="İsim" placeholderTextColor={colors.subText} value={newDeck.name} onChangeText={(t) => setNewDeck({ ...newDeck, name: t })} style={[styles.input, { borderColor: colors.border, color: colors.text }]} />
+                <TextInput placeholder="Açıklama" placeholderTextColor={colors.subText} value={newDeck.description} onChangeText={(t) => setNewDeck({ ...newDeck, description: t })} style={[styles.input, { borderColor: colors.border, color: colors.text }]} />
                 <TouchableOpacity style={styles.saveBtn} onPress={() => { if(newDeck.name) addDeckMutate(newDeck); }} disabled={isAddingDeck}>
                     {isAddingDeck ? <ActivityIndicator color="white" /> : <Text style={styles.btnText}>Oluştur</Text>}
                 </TouchableOpacity>
@@ -437,10 +441,10 @@ export default function IndexScreen() {
         renderItem={renderDeck}
         contentContainerStyle={{ paddingBottom: 160, padding: 4 }}
         ListEmptyComponent={() =>
-          isLoadingDecks ? <ActivityIndicator size="large" color="#ccc" style={{marginTop: 50}} /> :
+          isLoadingDecks ? <ActivityIndicator size="large" color={colors.subText} style={{marginTop: 50}} /> :
           <View style={styles.emptyContainer}>
-            <Ionicons name="file-tray-stacked-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>Henüz hiç desten yok.</Text>
+            <Ionicons name="file-tray-stacked-outline" size={64} color={colors.subText} />
+            <Text style={[styles.emptyText, { color: colors.subText }]}>Henüz hiç desten yok.</Text>
           </View>
         }
       />

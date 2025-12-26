@@ -1,5 +1,4 @@
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
@@ -9,9 +8,8 @@ import 'react-native-reanimated';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-// Sadece veritabanı başlatma importu kaldı.
-// Sync servisleri kaldırıldı.
 import { initializeDatabase } from '../lib/db';
+import { ThemeProvider, useTheme } from '../lib/ThemeContext';
 import Splash from './splash';
 
 export const unstable_settings = {
@@ -20,29 +18,27 @@ export const unstable_settings = {
 
 const queryClient = new QueryClient();
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+ function RootLayoutNav() {
+  
+  const { theme, isDark } = useTheme();
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Sadece yerel veritabanını başlatıyoruz
         await initializeDatabase();
         console.log("Database (Offline) başarıyla başlatıldı.");
       } catch (error) {
         console.error("Database başlatılırken hata oluştu:", error);
-        // Hata olsa bile uygulamayı açmaya çalışalım (Splash'te takılmasın)
       } finally {
         // UI render edilmeye hazır
-        setIsReady(true); //burası açılacak
+        setIsReady(true);
       }
     };
 
     initializeApp();
   }, []);
 
-  // Veritabanı hazır olana kadar Splash ekranını göster
   if (!isReady) {
     return <Splash />;
   }
@@ -52,16 +48,16 @@ export default function RootLayout() {
       {/* Popup Menu (Deste seçenekleri için) Sağlayıcısı */}
       <MenuProvider>
         {/* Tema (Dark/Light) Sağlayıcısı */}
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <NavigationThemeProvider value={theme === 'dark' ? DarkTheme : DefaultTheme}>
           {/* React Query (Veri Yönetimi) Sağlayıcısı */}
           <QueryClientProvider client={queryClient}>
-            
+
             <Stack
               screenOptions={{
                 headerStyle: {
-                  backgroundColor: colorScheme === 'dark' ? '#1c1c1e' : '#ffffff',
+                  backgroundColor: theme === 'dark' ? '#1c1c1e' : '#ffffff',
                 },
-                headerTintColor: colorScheme === 'dark' ? '#ffffff' : '#000000',
+                headerTintColor: theme === 'dark' ? '#ffffff' : '#000000',
                 headerTitleStyle: {
                   fontWeight: 'bold',
                 },
@@ -70,7 +66,7 @@ export default function RootLayout() {
             >
               {/* Ana Çekmece (Drawer) Navigasyonu */}
               <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
-              
+
               {/* Modal Ekranlar */}
               <Stack.Screen
                 name="addcard"
@@ -80,13 +76,13 @@ export default function RootLayout() {
                 name="editDeck"
                 options={{ presentation: 'modal', title: 'Desteyi Düzenle' }}
               />
-              
+
               {/* Normal Ekranlar */}
               <Stack.Screen
                 name="practice"
                 options={{ title: 'Pratik Seçenekleri' }}
               />
-              
+
               {/* Pratik Modları */}
               <Stack.Screen
                 name="pratik/classic"
@@ -94,11 +90,11 @@ export default function RootLayout() {
               />
               <Stack.Screen
                 name="pratik/match"
-                options={{ title: 'Eşleştirme'}} // Oyun ekranlarında header kapatılabilir
+                options={{ title: 'Eşleştirme' }}
               />
               <Stack.Screen
                 name="pratik/truefalse"
-                options={{ title: 'Doğru / Yanlış'}}
+                options={{ title: 'Doğru / Yanlış' }}
               />
               <Stack.Screen
                 name="pratik/write"
@@ -108,7 +104,7 @@ export default function RootLayout() {
                 name="pratik/multiple"
                 options={{ title: 'Çoktan Seçmeli' }}
               />
-               <Stack.Screen
+              <Stack.Screen
                 name="pratik/random"
                 options={{ title: 'Rastgele' }}
               />
@@ -120,10 +116,18 @@ export default function RootLayout() {
               
             </Stack>
 
-            <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+            <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
           </QueryClientProvider>
-        </ThemeProvider>
+        </NavigationThemeProvider>
       </MenuProvider>
     </GestureHandlerRootView>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootLayoutNav />
+    </ThemeProvider>
   );
 }

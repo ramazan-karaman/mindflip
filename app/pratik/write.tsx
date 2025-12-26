@@ -26,6 +26,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as CardRepository from '../../lib/repositories/cardRepository';
 import { savePracticeSession } from '../../lib/services/practiceService';
+import { useTheme } from '../../lib/ThemeContext';
 import { Card } from '../../lib/types';
 
 const { width } = Dimensions.get('window');
@@ -38,6 +39,49 @@ interface TypingCard extends Card {
 export default function TypingScreen() {
     const { deckId } = useLocalSearchParams<{ deckId: string }>();
     const router = useRouter();
+
+    const { isDark } = useTheme();
+
+    const colors = {
+        background: isDark ? '#000000' : '#F5F7FA',
+        text: isDark ? '#FFFFFF' : '#333333',
+        subText: isDark ? '#AAAAAA' : '#555555',
+        
+        // Header & Stats
+        progressBg: isDark ? '#1C1C1E' : '#ffffff',
+        progressText: isDark ? '#aaa' : '#555',
+        fireBg: isDark ? '#3E2723' : '#FFF3E0',
+        fireBorder: isDark ? '#5D4037' : '#FFE0B2',
+        fireText: isDark ? '#FFAB91' : '#FF9800',
+        scoreBg: isDark ? '#0D47A1' : '#E3F2FD',
+        scoreText: isDark ? '#64B5F6' : '#2196F3',
+        progressBarBg: isDark ? '#333' : '#E0E0E0',
+
+        // Soru Alanı
+        questionLabel: isDark ? '#90A4AE' : '#90A4AE',
+        imageBg: isDark ? '#121212' : '#eee',
+
+        // Input Alanı (Bottom Sheet)
+        inputAreaBg: isDark ? '#1C1C1E' : '#ffffff',
+        inputDefaultBorder: isDark ? '#444' : '#E0E0E0',
+        inputDefaultBg: isDark ? '#2C2C2E' : '#ffffff',
+        inputText: isDark ? '#FFFFFF' : '#333333',
+        placeholder: isDark ? '#666666' : '#999',
+
+        // Geri Bildirim (Feedback) Arka Planları
+        successBg: isDark ? '#1B5E20' : '#E8F5E9', // Koyu yeşil / Açık yeşil
+        errorBg: isDark ? '#B71C1C' : '#FFEBEE',   // Koyu kırmızı / Açık kırmızı
+        correctionBg: isDark ? '#3E2723' : '#FFEBEE',
+        correctionBorder: isDark ? '#D32F2F' : '#EF9A9A',
+
+        // Sonuç Ekranı
+        resultBg: isDark ? '#000000' : '#ffffff',
+        statItemBg: isDark ? '#1C1C1E' : '#F5F7FA',
+        statItemFullBg: isDark ? '#1B5E20' : '#E8F5E9',
+        exitBtnBg: isDark ? '#000000' : '#ffffff',
+        exitBtnBorder: isDark ? '#333' : '#eee',
+        exitBtnText: isDark ? '#ccc' : '#666',
+    };
 
     // --- OYUN DURUMU ---
     const [queue, setQueue] = useState<TypingCard[]>([]);
@@ -138,7 +182,7 @@ export default function TypingScreen() {
                 const newStreak = currentStreak + 1;
                 setCurrentStreak(newStreak);
                 if (newStreak > maxStreak) setMaxStreak(newStreak);
-                // İpucu kullanıldıysa puan kırılabilir ama şimdilik basit tutalım
+                // İpucu kullanıldıysa puan kırılabilir (şimdilik yok)
                 setScore(s => s + 10 + (newStreak > 3 ? 5 : 0));
             }
 
@@ -204,7 +248,7 @@ export default function TypingScreen() {
             const charToAdd = correctAnswer[nextCharIndex];
             setUserInput(prev => prev + charToAdd);
 
-            // İpucu kullanıldığı için o anlık puan kırılabilir veya streak bozulabilir (Opsiyonel)
+            // İpucu kullanıldığı için o anlık puan kırılabilir veya streak bozulabilir (şimdilik yok)
             // Şimdilik sadece kullanıcıya yardım ediyoruz.
         }
     };
@@ -235,26 +279,37 @@ export default function TypingScreen() {
     const currentCardNumber = Math.min(totalInitialCards, totalInitialCards - nonRetryQueueLength + 1);
     const progressPercent = totalInitialCards > 0 ? ((currentCardNumber) / totalInitialCards) * 100 : 0;
 
+    let inputBorderColor = colors.inputDefaultBorder;
+    let inputBgColor = colors.inputDefaultBg;
+
+    if (feedbackStatus === 'correct') {
+        inputBorderColor = '#4CAF50';
+        inputBgColor = colors.successBg;
+    } else if (feedbackStatus === 'wrong') {
+        inputBorderColor = '#F44336';
+        inputBgColor = colors.errorBg;
+    }
+
     // RENDER
-    if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#2196F3" /></View>;
+    if (loading) return <View style={[styles.center, { backgroundColor: colors.background }]}><ActivityIndicator size="large" color="#2196F3" /></View>;
 
     if (gameOver) {
         const accuracy = calculateAccuracy();
         return (
-            <View style={styles.resultContainer}>
+            <View style={[styles.resultContainer, { backgroundColor: colors.resultBg }]}>
                 <Ionicons name="trophy" size={100} color="#FFD700" style={styles.trophyIcon} />
-                <Text style={styles.resultTitle}>Tebrikler!</Text>
+                <Text style={[styles.resultTitle, { color: colors.text }]}>Tebrikler!</Text>
 
                 <View style={styles.statsGrid}>
-                    <View style={styles.statItem}>
+                    <View style={[styles.statItem, { backgroundColor: colors.statItemBg }]}>
                         <Text style={styles.statLabel}>Puan</Text>
-                        <Text style={styles.statValue}>{score}</Text>
+                        <Text style={[styles.statValue, { color: colors.text }]}>{score}</Text>
                     </View>
-                    <View style={styles.statItem}>
+                    <View style={[styles.statItem, { backgroundColor: colors.statItemBg }]}>
                         <Text style={styles.statLabel}>Max Kombo</Text>
-                        <Text style={styles.statValue}>🔥 {maxStreak}</Text>
+                        <Text style={[styles.statValue, { color: colors.text }]}>{score}🔥 {maxStreak}</Text>
                     </View>
-                    <View style={styles.statItemFull}>
+                    <View style={[styles.statItemFull, { backgroundColor: colors.statItemFullBg }]}>
                         <Text style={styles.statLabel}>Ustalık Yüzdesi</Text>
                         <Text style={[styles.statValue, { color: accuracy > 80 ? '#4CAF50' : '#FF9800' }]}>
                             %{accuracy}
@@ -268,8 +323,8 @@ export default function TypingScreen() {
                         <Text style={styles.playAgainText}>Tekrar Oyna</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.exitBtn} onPress={() => router.back()}>
-                        <Text style={styles.exitBtnText}>Listeye Dön</Text>
+                    <TouchableOpacity style={[styles.exitBtn, { backgroundColor: colors.exitBtnBg, borderColor: colors.exitBtnBorder }]} onPress={() => router.back()}>
+                        <Text style={[styles.exitBtnText, { color: colors.exitBtnText }]}>Listeye Dön</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -278,46 +333,42 @@ export default function TypingScreen() {
 
     const activeCard = queue[0];
 
-    // Dinamik Stiller
-    let inputBorderColor = '#E0E0E0';
-    let inputBgColor = '#fff';
-
-    if (feedbackStatus === 'correct') {
-        inputBorderColor = '#4CAF50';
-        inputBgColor = '#E8F5E9';
-    } else if (feedbackStatus === 'wrong') {
-        inputBorderColor = '#F44336';
-        inputBgColor = '#FFEBEE';
-    }
-
     return (
         <KeyboardAvoidingView
-            style={{ flex: 1 }}
+            style={{ flex: 1, backgroundColor: colors.background }}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-            <View style={styles.container}>
+            <View style={[styles.container, { backgroundColor: colors.background }]}>
 
                 {/* HEADER */}
                 <View style={styles.headerContainer}>
                     <View style={styles.topBar}>
-                        <View style={styles.progressTextContainer}>
-                            <Text style={styles.progressLabel}>
+                        <View style={[styles.progressTextContainer, { backgroundColor: colors.progressBg }]}>
+                            <Text style={[styles.progressLabel, { color: colors.progressText }]}>
                                 {currentCardNumber} / {totalInitialCards}
                             </Text>
                         </View>
 
                         <View style={styles.scoreWrapper}>
-                            <View style={[styles.fireContainer, currentStreak === 0 && styles.fireContainerInactive]}>
-                                <Text style={[styles.fireText, currentStreak === 0 && styles.fireTextInactive]}>
+                            <View style={[
+                                styles.fireContainer, 
+                                { backgroundColor: colors.fireBg, borderColor: colors.fireBorder },
+                                currentStreak === 0 && { backgroundColor: isDark ? '#222' : '#F5F5F5', borderColor: isDark ? '#333' : '#E0E0E0' }
+                            ]}>
+                                <Text style={[
+                                    styles.fireText, 
+                                    { color: colors.fireText },
+                                    currentStreak === 0 && { color: isDark ? '#555' : '#BDBDBD' }
+                                ]}>
                                     🔥 {currentStreak}
                                 </Text>
                             </View>
-                            <View style={styles.scoreContainer}>
-                                <Text style={styles.scoreTextSmall}>{score}</Text>
+                            <View style={[styles.scoreContainer, { backgroundColor: colors.scoreBg }]}>
+                                <Text style={[styles.scoreTextSmall, { color: colors.scoreText }]}>{score}</Text>
                             </View>
                         </View>
                     </View>
-                    <View style={styles.progressBarBackground}>
+                    <View style={[styles.progressBarBackground, { backgroundColor: colors.progressBarBg }]}>
                         <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
                     </View>
                 </View>
@@ -332,23 +383,23 @@ export default function TypingScreen() {
                     )}
 
                     {activeCard.front_image ? (
-                        <Image source={{ uri: activeCard.front_image }} style={styles.questionImage} resizeMode="cover" />
+                        <Image source={{ uri: activeCard.front_image }} style={[styles.questionImage, { backgroundColor: colors.imageBg }]} resizeMode="cover" />
                     ) : (
-                        // Görsel yoksa metin daha büyük ve ortada
                         <View style={{ height: 20 }} />
                     )}
 
-                    <Text style={styles.questionLabel}>Bunu yazınız:</Text>
-                    <Text style={styles.questionText}>{activeCard.front_word}</Text>
+                    <Text style={[styles.questionLabel, { color: colors.questionLabel }]}>Bunu yazınız:</Text>
+                    <Text style={[styles.questionText, { color: colors.text }]}>{activeCard.front_word}</Text>
                 </View>
 
                 {/* INPUT ALANI */}
-                <View style={styles.inputArea}>
+                <View style={[styles.inputArea, { backgroundColor: colors.inputAreaBg, shadowColor: isDark ? '#000' : '#000' }]}>
 
                     {/* Yanlış Cevap Geri Bildirimi (Sadece yanlışsa görünür) */}
                     {feedbackStatus === 'wrong' && (
                         <Animated.View
-                            entering={FadeInDown.springify().damping(12)} style={styles.correctionContainer}>
+                            entering={FadeInDown.springify().damping(12)}
+                             style={[styles.correctionContainer, { backgroundColor: colors.correctionBg, borderColor: colors.correctionBorder }]}>
                             <Text style={styles.correctionLabel}>Doğrusu:</Text>
                             <Text style={styles.correctionText}>{activeCard.back_word}</Text>
                         </Animated.View>
@@ -358,11 +409,11 @@ export default function TypingScreen() {
                         <Animated.View style={[styles.inputContainer, { borderColor: inputBorderColor, backgroundColor: inputBgColor }, animatedInputStyle]}>
                             <TextInput
                                 ref={inputRef}
-                                style={styles.textInput}
+                                style={[styles.textInput, { color: colors.inputText }]}
                                 value={userInput}
                                 onChangeText={setUserInput}
                                 placeholder="Cevabı buraya yaz..."
-                                placeholderTextColor="#999"
+                                placeholderTextColor={colors.placeholder}
                                 autoFocus={true} // Klavye otomatik açılır
                                 autoCapitalize="none"
                                 autoCorrect={false}
